@@ -1,0 +1,19 @@
+function I_ilumination=ilumination_correction(I)  
+    
+    I_fringes = I;
+    for i=3:2:100    
+        SE = strel('rectangle',[15 i]);
+        I_fringes=imopen(I_fringes,SE);
+        I_fringes=imclose(I_fringes,SE);
+    end
+    
+    I_disk=I-I_fringes+mean(mean(I_fringes));
+    for i=3:2:100    
+        SE = strel('disk', i);
+        I_disk=imopen(I_disk,SE);
+        I_disk=imclose(I_disk,SE);
+    end
+    
+    I_ilumination=I-I_fringes+mean(mean(I_fringes));
+  
+end
