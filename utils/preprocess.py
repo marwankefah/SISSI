@@ -87,7 +87,6 @@ def EGT_Segmentation(I, min_cell_size=1, upper_hole_size_bound=np.inf, manual_fi
     S = magnitude > threshold
 
 
-    # TODO +-
     S = fill_holes(S, upper_hole_size_bound)
     S = S.astype(np.uint8)
     SE = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))

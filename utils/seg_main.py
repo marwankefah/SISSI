@@ -13,7 +13,7 @@ from skimage.segmentation import watershed
 from skimage.feature import peak_local_max
 from utils.preprocess import illumination_correction, EGT_Segmentation, mask_overlay
 
-cell_type = 'inhib'
+cell_type = 'dead'
 data_dir = Path(
     "../data/chrisi/" + cell_type + "/"
 )
@@ -63,7 +63,8 @@ for image, cell_name in dead_images_raw:
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-    distance = ndi.distance_transform_edt(S)
+    distance = ndi.distance_transform_edt(foreground)
+
     #TODO implement seed instead to get coords(markers)
     coords = peak_local_max(distance, footprint=np.ones((10, 10)), labels=S)
 
@@ -71,7 +72,7 @@ for image, cell_name in dead_images_raw:
     mask = np.zeros(distance.shape, dtype=bool)
     mask[tuple(coords.T)] = True
     markers, _ = ndi.label(mask)
-    #watershed output
+    #watershed output #Todo put distance in watershed or image??
     labels = watershed(-distance, markers, mask=S)
 
     #outlines for plotting from cellpose
