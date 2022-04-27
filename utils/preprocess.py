@@ -1,9 +1,12 @@
+import colorsys
+import math
+
 import cv2
 import numpy as np
 from skimage import morphology
 import warnings
 import matplotlib.pyplot as plt
-
+from skimage import measure
 
 def illumination_correction(image):
     # Alternate filtering
@@ -17,7 +20,7 @@ def illumination_correction(image):
     return I_ilumination
 
 
-def EGT_Segmentation(I, min_cell_size=1, upper_hole_size_bound=999999, manual_finetune=0):
+def EGT_Segmentation(I, min_cell_size=1, upper_hole_size_bound=np.inf, manual_finetune=0):
     # this controls how far each increment of manual_finetune moves the percentile threshold
     greedy_step = 1
 
@@ -83,13 +86,12 @@ def EGT_Segmentation(I, min_cell_size=1, upper_hole_size_bound=999999, manual_fi
     # # Threshold the gradient image and perform some cleaning with morphological operations
     S = magnitude > threshold
 
-    plt.imshow(S,cmap="gray")
-    plt.show()
 
-    #TODO +-
+    # TODO +-
     S = fill_holes(S, upper_hole_size_bound)
+    S = S.astype(np.uint8)
+    SE = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 
-    SE = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
     S = cv2.morphologyEx(S, cv2.MORPH_ERODE, SE)
 
     S = cv2.morphologyEx(S, cv2.MORPH_ERODE, SE)
@@ -111,13 +113,86 @@ def percentile_computation(A, p):
     B = np.sort(B)
 
     indx = round(p * len(B) + 1)
-    if indx<1:
-        indx=1
-    elif indx>len(B):
-        indx=len(B)
+    if indx < 1:
+        indx = 1
+    elif indx > len(B):
+        indx = len(B)
 
     T = B[indx]
 
     # T = np.reshape(T, p.shape)
 
     return T
+
+
+def fill_holes(S, upper_bound):
+    S = S.astype(bool)
+
+    if math.isinf(upper_bound):
+        all_labels = measure.label(~S, connectivity=2)
+
+        values, counts = np.unique(all_labels, return_counts=True)
+        counts.sort()
+        upper_bound = counts[-1]
+        if np.size(upper_bound) == 0:
+            upper_bound = 0
+
+    BWu = morphology.remove_small_objects(~(S.astype(bool)), min_size=upper_bound, connectivity=4)
+    BWu = (~S).astype(np.uint8) - BWu.astype(np.uint8)
+    S[BWu > 0] = 1
+
+    return S
+
+
+def mask_overlay(img, masks, colors=None):
+    """ overlay masks on image (set image to grayscale)
+    Parameters
+    ----------------
+    img: int or float, 2D or 3D array
+        img is of size [Ly x Lx (x nchan)]
+    masks: int, 2D array
+        masks where 0=NO masks; 1,2,...=mask labels
+    colors: int, 2D array (optional, default None)
+        size [nmasks x 3], each entry is a color in 0-255 range
+    Returns
+    ----------------
+    RGB: uint8, 3D array
+        array of masks overlaid on grayscale image
+    """
+    if colors is not None:
+        if colors.max() > 1:
+            colors = np.float32(colors)
+            colors /= 255
+        colors = rgb_to_hsv(colors)
+    if img.ndim > 2:
+        img = img.astype(np.float32).mean(axis=-1)
+    else:
+        img = img.astype(np.float32)
+
+    HSV = np.zeros((img.shape[0], img.shape[1], 3), np.float32)
+    HSV[:, :, 2] = np.clip((img / 255. if img.max() > 1 else img) * 1.5, 0, 1)
+    hues = np.linspace(0, 1, masks.max() + 1)[np.random.permutation(masks.max())]
+    for n in range(int(masks.max())):
+        ipix = (masks == n + 1).nonzero()
+        if colors is None:
+            HSV[ipix[0], ipix[1], 0] = hues[n]
+        else:
+            HSV[ipix[0], ipix[1], 0] = colors[n, 0]
+        HSV[ipix[0], ipix[1], 1] = 1.0
+    RGB = (hsv_to_rgb(HSV) * 255).astype(np.uint8)
+    return RGB
+
+def rgb_to_hsv(arr):
+    rgb_to_hsv_channels = np.vectorize(colorsys.rgb_to_hsv)
+    r, g, b = np.rollaxis(arr, axis=-1)
+    h, s, v = rgb_to_hsv_channels(r, g, b)
+    hsv = np.stack((h,s,v), axis=-1)
+    return hsv
+
+
+def hsv_to_rgb(arr):
+    hsv_to_rgb_channels = np.vectorize(colorsys.hsv_to_rgb)
+    h, s, v = np.rollaxis(arr, axis=-1)
+    r, g, b = hsv_to_rgb_channels(h, s, v)
+    rgb = np.stack((r,g,b), axis=-1)
+    return rgb
