@@ -2,3 +2,4 @@
 /model/
 /.idea/
 /__pycache__/
+/utils/foreground_seg/
