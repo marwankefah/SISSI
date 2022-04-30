@@ -1,5 +1,5 @@
 function I_ilumination=ilumination_correction(I)      
-    
+    %mmm
     I_fringes = I;
     for i=3:2:100    
         SE = strel('rectangle',[10 i]);
