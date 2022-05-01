@@ -27,7 +27,7 @@ from .preprocess import (
     mask_overlay,
 )
 
-from .seed_detection import log_kernel, conv2_spec_symetric, glogkernel
+from .seed_detection import log_kernel, conv2_spec_symetric, glogkernel, seed_detection
 
 
 __all__ = [
@@ -57,4 +57,5 @@ __all__ = [
     "log_kernel",
     "conv2_spec_symetric",
     "glogkernel",
+    "seed_detection",
 ]
