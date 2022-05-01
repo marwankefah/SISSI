@@ -8,6 +8,7 @@ import warnings
 import matplotlib.pyplot as plt
 from skimage import measure
 
+
 def illumination_correction(image):
     # Alternate filtering
     img = image.copy()
@@ -20,7 +21,9 @@ def illumination_correction(image):
     return I_ilumination
 
 
-def EGT_Segmentation(I, min_cell_size=1, upper_hole_size_bound=np.inf, manual_finetune=0):
+def EGT_Segmentation(
+    I, min_cell_size=1, upper_hole_size_bound=np.inf, manual_finetune=0
+):
     # this controls how far each increment of manual_finetune moves the percentile threshold
     greedy_step = 1
 
@@ -29,7 +32,7 @@ def EGT_Segmentation(I, min_cell_size=1, upper_hole_size_bound=np.inf, manual_fi
     sobely = cv2.Sobel(I, cv2.CV_64F, 0, 1)
 
     # Find magnitude and angle
-    magnitude = np.sqrt(sobelx ** 2.0 + sobely ** 2.0)
+    magnitude = np.sqrt(sobelx**2.0 + sobely**2.0)
     angle = np.arctan2(sobely, sobelx) * (180 / np.pi)
     S1 = magnitude[np.nonzero(magnitude)]
     ratio = (np.max(S1) - np.min(S1)) / 1000
@@ -43,7 +46,7 @@ def EGT_Segmentation(I, min_cell_size=1, upper_hole_size_bound=np.inf, manual_fi
     # # compute lower bound
     lower_bound = 3 * hist_mode_mean
     if lower_bound > np.size(temp_hist):
-        warnings.warn('lower bound set to end of list.')
+        warnings.warn("lower bound set to end of list.")
         lower_bound = np.size(temp_hist)
     #
     # # ensure that 75% of the pixels have been taken
@@ -56,7 +59,7 @@ def EGT_Segmentation(I, min_cell_size=1, upper_hole_size_bound=np.inf, manual_fi
 
     # Compute the density metric
     if upper_bound > np.size(temp_hist):
-        warnings.warn('upper bound set to end of list.')
+        warnings.warn("upper bound set to end of list.")
         upper_bound = np.size(temp_hist)
 
     density_metric = np.sum(temp_hist[lower_bound:upper_bound])
@@ -79,13 +82,12 @@ def EGT_Segmentation(I, min_cell_size=1, upper_hole_size_bound=np.inf, manual_fi
         prct_value = 100
     if prct_value < 1:
         prct_value = 1
-    prct_value = prct_value / 100;
+    prct_value = prct_value / 100
 
     threshold = percentile_computation(S1, prct_value)
     #
     # # Threshold the gradient image and perform some cleaning with morphological operations
     S = magnitude > threshold
-
 
     S = fill_holes(S, upper_hole_size_bound)
     S = S.astype(np.uint8)
@@ -95,13 +97,15 @@ def EGT_Segmentation(I, min_cell_size=1, upper_hole_size_bound=np.inf, manual_fi
 
     S = cv2.morphologyEx(S, cv2.MORPH_ERODE, SE)
 
-    S = morphology.remove_small_objects(S.astype(bool), min_size=min_cell_size, connectivity=8)
+    S = morphology.remove_small_objects(
+        S.astype(bool), min_size=min_cell_size, connectivity=8
+    )
 
     return S
 
 
 def percentile_computation(A, p):
-    assert (p >= 0 and 1 >= p)
+    assert p >= 0 and 1 >= p
 
     B = A[~np.isnan(A)]
 
@@ -136,7 +140,9 @@ def fill_holes(S, upper_bound):
         if np.size(upper_bound) == 0:
             upper_bound = 0
 
-    BWu = morphology.remove_small_objects(~(S.astype(bool)), min_size=upper_bound, connectivity=4)
+    BWu = morphology.remove_small_objects(
+        ~(S.astype(bool)), min_size=upper_bound, connectivity=4
+    )
     BWu = (~S).astype(np.uint8) - BWu.astype(np.uint8)
     S[BWu > 0] = 1
 
@@ -144,7 +150,7 @@ def fill_holes(S, upper_bound):
 
 
 def mask_overlay(img, masks, colors=None):
-    """ overlay masks on image (set image to grayscale)
+    """overlay masks on image (set image to grayscale)
     Parameters
     ----------------
     img: int or float, 2D or 3D array
@@ -169,7 +175,7 @@ def mask_overlay(img, masks, colors=None):
         img = img.astype(np.float32)
 
     HSV = np.zeros((img.shape[0], img.shape[1], 3), np.float32)
-    HSV[:, :, 2] = np.clip((img / 255. if img.max() > 1 else img) * 1.5, 0, 1)
+    HSV[:, :, 2] = np.clip((img / 255.0 if img.max() > 1 else img) * 1.5, 0, 1)
     hues = np.linspace(0, 1, masks.max() + 1)[np.random.permutation(masks.max())]
     for n in range(int(masks.max())):
         ipix = (masks == n + 1).nonzero()
@@ -181,11 +187,12 @@ def mask_overlay(img, masks, colors=None):
     RGB = (hsv_to_rgb(HSV) * 255).astype(np.uint8)
     return RGB
 
+
 def rgb_to_hsv(arr):
     rgb_to_hsv_channels = np.vectorize(colorsys.rgb_to_hsv)
     r, g, b = np.rollaxis(arr, axis=-1)
     h, s, v = rgb_to_hsv_channels(r, g, b)
-    hsv = np.stack((h,s,v), axis=-1)
+    hsv = np.stack((h, s, v), axis=-1)
     return hsv
 
 
@@ -193,5 +200,5 @@ def hsv_to_rgb(arr):
     hsv_to_rgb_channels = np.vectorize(colorsys.hsv_to_rgb)
     h, s, v = np.rollaxis(arr, axis=-1)
     r, g, b = hsv_to_rgb_channels(h, s, v)
-    rgb = np.stack((r,g,b), axis=-1)
+    rgb = np.stack((r, g, b), axis=-1)
     return rgb
