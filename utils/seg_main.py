@@ -69,8 +69,10 @@ for image, cell_name in dead_images_raw:
     coords = peak_local_max(distance, footprint=np.ones((10, 10)), labels=S)
 
 
-    mask = np.zeros(distance.shape, dtype=bool)
+    mask = np.zeros(S.shape, dtype=bool)
     mask[tuple(coords.T)] = True
+
+
     markers, _ = ndi.label(mask)
     #watershed output #Todo put distance in watershed or image??
     labels = watershed(-distance, markers, mask=S)
