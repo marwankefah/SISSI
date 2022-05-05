@@ -62,10 +62,11 @@ def conv2_spec_symetric(x, h) -> np.ndarray:
     m = math.floor(h.shape[1] / 2)
     x = np.pad(x, ((n, n), (m, m)), "symmetric")
     y = np.real(
-        ifft2(fft2(x, (x.shape[0], x.shape[1])) * fft2(h, (x.shape[0], x.shape[1])))
+        ifft2(fft2(x, (x.shape[0], x.shape[1]))
+              * fft2(h, (x.shape[0], x.shape[1])))
     )
     y = np.roll(y, (-n, -m), axis=(0, 1))
-    y = y[n : y.shape[0] - n, m : y.shape[1] - m]
+    y = y[n: y.shape[0] - n, m: y.shape[1] - m]
     return y
 
 
@@ -80,7 +81,8 @@ def glogkernel(sigma_x, sigma_y, theta) -> np.ndarray:
     a = np.cos(theta) ** 2 / (2 * sigma_x**2) + np.sin(theta) ** 2 / (
         2 * sigma_y**2
     )
-    b = -np.sin(2 * theta) / (4 * sigma_x**2) + np.sin(2 * theta) / (4 * sigma_y**2)
+    b = -np.sin(2 * theta) / (4 * sigma_x**2) + \
+        np.sin(2 * theta) / (4 * sigma_y**2)
     c = np.sin(theta) ** 2 / (2 * sigma_x**2) + np.cos(theta) ** 2 / (
         2 * sigma_y**2
     )
@@ -122,6 +124,7 @@ def seed_detection(image, fg_mask, sigma0=10, alpha=0.03):
     np.ndarray
         Binary array with 1 for seed points
     """
+
     t = np.arange(np.log(sigma0), 3.5, 0.2)
     theta = np.pi / 4
     sigma = np.exp(t)
@@ -145,7 +148,7 @@ def seed_detection(image, fg_mask, sigma0=10, alpha=0.03):
 
     best = zeta.index(max(zeta))  # %%
     sigma_x_min = sigma[max(best - 3, 1)]
-    sigma_x_max = sigma[min(best + 3, len(sigma))]
+    sigma_x_max = sigma[min(best + 3, len(sigma)-1)]
     sigma_x = np.arange(math.ceil(sigma_x_min), math.floor(sigma_x_max))
 
     R = np.zeros_like(image)
@@ -191,6 +194,7 @@ def plot_seeds(image_path, mask_path, output_path, sigma0, alpha):
     alpha : float
         alpha parameter
     """
+
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     fg_mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
     fg_mask = fg_mask > 127
