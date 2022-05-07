@@ -8,15 +8,6 @@ import configparser
 import os
 import torch.optim as optim
 from monai.transforms.utility.dictionary import Lambdad
-from torch.nn.modules.loss import CrossEntropyLoss, BCELoss
-
-# from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-# from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor, MaskRCNN_ResNet50_FPN_Weights
-import torchvision
-import monai
-import segmentation_models_pytorch as smp
-from torchvision.models.resnet import ResNet50_Weights
-from torchvision.models.detection.mask_rcnn import MaskRCNN_ResNet50_FPN_Weights
 
 import reference.transforms as T
 from torchvision_our.models.detection.faster_rcnn import FastRCNNPredictor
@@ -84,6 +75,9 @@ class Configs:
 
         self.optim = config_file.get('network', 'optim', fallback='adam')
 
+        self.lr_step_size = config_file.getfloat('network', 'lr_step_size', fallback=8)
+        self.lr_gamma = config_file.getfloat('network', 'lr_gamma', fallback=0.1)
+
         self.psuedoLabelsGenerationEpoch = config_file.getint('network', 'psuedoLabelsGenerationEpoch', fallback=3)
         self.mean_teacher_epoch = config_file.getint('network', 'mean_teacher_epoch', fallback=3)
         self.num_workers = config_file.getint('network', 'num_workers', fallback=0)
@@ -121,13 +115,10 @@ class Configs:
         )
 
         self.model = self.create_mask_rcnn(self.num_classes)
-
-        if self.load_model:
-            print(self.model_path)
-            self.model.load_state_dict(torch.load(self.model_path))
-
         use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if use_cuda else "cpu")
+
+        self.model.to(self.device)
 
         if self.optim.lower() == 'sgd':
             self.optimizer = optim.SGD(self.model.parameters(), lr=self.base_lr,
@@ -136,6 +127,11 @@ class Configs:
             self.optimizer = optim.Adam(self.model.parameters(), lr=self.base_lr)
         else:
             raise Exception("Optimizer is not supported")
+
+        # self.lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[1, 10],
+        #                                                          gamma=0.1)
+
+        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.lr_step_size, gamma=self.lr_gamma)
 
         # writers
         self.train_writer = None
@@ -192,59 +188,69 @@ class Configs:
             # device=self.device
         )
 
-        self.train_transform = Compose(
-            [
-                LoadImaged(keys=["image", "label"], reader=image_loader),
-                lambda_transform_channel,
-                channel_transform,
+        # self.train_transform = Compose(
+        #     [
+        #         LoadImaged(keys=["image", "label"], reader=image_loader),
+        #         lambda_transform_channel,
+        #         channel_transform,
+        #
+        #         LabelToMaskd(keys=["label"], select_labels=[1]),
+        #
+        #         ScaleIntensityd(keys=["image", "label"]),
+        #
+        #         Resized(keys=["image", "label"], spatial_size=(self.patch_size[0], self.patch_size[1])),
+        #         RandRotated(keys=["image", "label"], range_x=(-np.pi / 6, np.pi / 6), prob=0.5, keep_size=True),
+        #
+        #         RandFlipd(keys=["image", "label"], spatial_axis=0, prob=0.5),
+        #         RandFlipd(keys=["image", "label"], spatial_axis=1, prob=0.5),
+        #
+        #         RandZoomd(keys=["image", "label"], min_zoom=0.9, max_zoom=1.1, prob=0.5),
+        #
+        #         RandGaussianSmoothd(keys=["image"], prob=0.1, sigma_x=(0.25, 1.5), sigma_y=(0.25, 1.5)),
+        #         RandGaussianNoised(keys=["image"], mean=0, std=0.1, prob=0.5),
+        #
+        #         OneOf(transforms=[affine, deform], weights=[0.8, 0.2]),
+        #         # NormalizeIntensity(subtrahend=None, divisor=None, channel_wise=False),
+        #
+        #         EnsureTyped(keys=["image", "label"], ),
+        #     ]
+        # )
 
-                LabelToMaskd(keys=["label"], select_labels=[1]),
-
-                ScaleIntensityd(keys=["image", "label"]),
-
-                Resized(keys=["image", "label"], spatial_size=(self.patch_size[0], self.patch_size[1])),
-                RandRotated(keys=["image", "label"], range_x=(-np.pi / 6, np.pi / 6), prob=0.5, keep_size=True),
-
-                RandFlipd(keys=["image", "label"], spatial_axis=0, prob=0.5),
-                RandFlipd(keys=["image", "label"], spatial_axis=1, prob=0.5),
-
-                RandZoomd(keys=["image", "label"], min_zoom=0.9, max_zoom=1.1, prob=0.5),
-
-                RandGaussianSmoothd(keys=["image"], prob=0.1, sigma_x=(0.25, 1.5), sigma_y=(0.25, 1.5)),
-                RandGaussianNoised(keys=["image"], mean=0, std=0.1, prob=0.5),
-
-                OneOf(transforms=[affine, deform], weights=[0.8, 0.2]),
-                # NormalizeIntensity(subtrahend=None, divisor=None, channel_wise=False),
-
-                EnsureTyped(keys=["image", "label"], ),
-            ]
-        )
-
-        self.val_transform = Compose(
-            [
-                LoadImaged(keys=["image", "label"], reader=image_loader),
-                lambda_transform_channel,
-                channel_transform,
-
-                LabelToMaskd(keys=["label"], select_labels=[1]),
-
-                ScaleIntensityd(keys=["image", "label"]),
-
-                # NormalizeIntensity(subtrahend=None, divisor=None, channel_wise=False),
-
-                Resized(keys=["image", "label"], spatial_size=(self.patch_size[0], self.patch_size[1])),
-                EnsureTyped(keys=["image", "label"])
-            ])
+        # self.val_transform = Compose(
+        #     [
+        #         LoadImaged(keys=["image", "label"], reader=image_loader),
+        #         lambda_transform_channel,
+        #         channel_transform,
+        #
+        #         LabelToMaskd(keys=["label"], select_labels=[1]),
+        #
+        #         ScaleIntensityd(keys=["image", "label"]),
+        #
+        #         # NormalizeIntensity(subtrahend=None, divisor=None, channel_wise=False),
+        #
+        #         Resized(keys=["image", "label"], spatial_size=(self.patch_size[0], self.patch_size[1])),
+        #         EnsureTyped(keys=["image", "label"])
+        #     ])
 
         self.train_transform = self.get_transform(True)
         self.val_transform = self.get_transform(False)
 
-        self.y_pred_trans = Compose(
-            [EnsureType(), Activations(softmax=True), AsDiscrete(argmax=True, to_onehot=self.num_classes)])
+        # self.y_pred_trans = Compose(
+        #     [EnsureType(), Activations(softmax=True), AsDiscrete(argmax=True, to_onehot=self.num_classes)])
 
-        self.y_trans = AsDiscrete(threshold=0.1, to_onehot=self.num_classes)
+        # self.y_trans = AsDiscrete(threshold=0.1, to_onehot=self.num_classes)
 
-        self.dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+        # self.dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+        self.best_performance = 0
+        self.start_epoch=0
+        if self.load_model:
+            print(self.model_path)
+            checkpoint = torch.load(self.model_path, map_location=self.device)
+            self.model.load_state_dict(checkpoint['model'])
+            self.optimizer.load_state_dict(checkpoint['optimizer'])
+            self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+            self.start_epoch = checkpoint['epoch'] + 1
+            self.best_performance = checkpoint['best_performance']
 
     def update_lr(self, iter_num):
         if self.optim.lower() == 'sgd':

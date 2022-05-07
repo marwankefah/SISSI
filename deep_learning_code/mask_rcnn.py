@@ -46,11 +46,11 @@ def train(configs, snapshot_path):
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
 
     trainloader = torch.utils.data.DataLoader(
-        db_train, batch_size=1, shuffle=True, num_workers=0,
+        db_train, batch_size=configs.labelled_bs, shuffle=True, num_workers=0,
         collate_fn=utils.collate_fn)
 
     valloader = torch.utils.data.DataLoader(
-        db_test, batch_size=1, shuffle=False, num_workers=0,
+        db_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=0,
         collate_fn=utils.collate_fn)
 
     configs.model.train()
@@ -63,14 +63,14 @@ def train(configs, snapshot_path):
     iter_num = 0
 
     max_epoch = configs.max_iterations // len(trainloader) + 1
-    iterator = tqdm(range(max_epoch), ncols=70)
-    best_AP_75_all = 0
+    iterator = tqdm(range(configs.start_epoch,max_epoch), ncols=70)
+    best_AP_75_all = configs.best_performance
 
     for epoch_num in iterator:
 
         train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
-
-        coco_evaulator = evaluate(configs.model, epoch_num, valloader, device=configs.device, writer=writer_val)
+        configs.lr_scheduler.step()
+        coco_evaulator = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
         # AP iou 0.75--all bbox
         AP_75_all = coco_evaulator.coco_eval['bbox'].stats[2]
@@ -83,9 +83,10 @@ def train(configs, snapshot_path):
             logging.info('saving model with best performance {}'.format(best_AP_75_all))
             utils.save_on_master({
                 'model': configs.model.state_dict(),
-                # 'optimizer': configs.optimizer.state_dict(),
-                # 'lr_scheduler': configs.lr_scheduler.state_dict(),
-                'epoch': epoch_num}, save_mode_path)
+                'optimizer': configs.optimizer.state_dict(),
+                'lr_scheduler': configs.lr_scheduler.state_dict(),
+                'epoch': epoch_num,
+                'best_performance':best_AP_75_all},save_mode_path)
 
         if iter_num >= configs.max_iterations:
             break
