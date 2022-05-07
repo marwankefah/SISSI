@@ -65,37 +65,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
 
         if iter_epoch % 20 == 0:
             # (epoch+1)*iter_epoch
-            # Fixme move to a function
-            # adding normal image with ground truth boxes
-            img = images[0].detach().cpu().numpy()
-            writer.add_image('image', img, iter_epoch)
-            img_gt_boxes_channel_last = np.moveaxis(images[0].detach().cpu().numpy(), 0, -1)
-            img_with_gt_boxes = visualize(img_gt_boxes_channel_last, targets[0]['boxes'].detach().cpu().numpy(),
-                                          targets[0]['labels'].detach().cpu().numpy(), category_id_to_name)
-            img_gt_boxes_channel_first = np.moveaxis(img_with_gt_boxes, -1, 0)
-            writer.add_image('image_GT_boxes', img_gt_boxes_channel_first, iter_epoch)
-            masks_binary = targets[0]['masks'].detach().cpu().numpy()
-            maski = np.zeros(shape=masks_binary[0].shape, dtype=np.uint16)
-            for idx, mask in enumerate(masks_binary):
-                maski[mask == 1] = idx + 1
-
-            img_gt_overlay = mask_overlay(img_gt_boxes_channel_last, maski)
-            img_gt_overlay_channel_first = np.moveaxis(img_gt_overlay, -1, 0)
-            writer.add_image('image_GT_masks', img_gt_overlay_channel_first, iter_epoch)
-            ##################################################################
-            img_with_output_boxes = visualize(img_gt_boxes_channel_last, outputs[0]['boxes'].detach().cpu().numpy(),
-                                          outputs[0]['labels'].detach().cpu().numpy(), category_id_to_name)
-            img_gt_output_channel_first = np.moveaxis(img_with_output_boxes, -1, 0)
-            writer.add_image('image_output_boxes', img_gt_output_channel_first, iter_epoch)
-            masks_binary = outputs[0]['masks'].squeeze().detach().cpu().numpy()
-            maski = np.zeros(shape=masks_binary[0].shape, dtype=np.uint16)
-            for idx, mask in enumerate(masks_binary):
-                maski[mask>0.5] = idx + 1
-
-            img_output_overlay = mask_overlay(img_gt_boxes_channel_last, maski)
-            img_output_overlay_channel_first = np.moveaxis(img_output_overlay, -1, 0)
-            writer.add_image('image_output_masks', img_output_overlay_channel_first, iter_epoch)
-
+            output_vis_to_tensorboard(images, targets, outputs, iter_epoch, writer)
 
         train_loss_dict = Counter(train_loss_dict) + Counter(loss_dict_reduced)
 
@@ -155,42 +125,11 @@ def evaluate(configs, epoch, data_loader, device, writer):
 
         torch.cuda.synchronize()
         with torch.no_grad():
-            loss_dict, outputs = configs.model(images, targets1)
+            losses, outputs = configs.model(images)
 
         if iter_per_epoch % 20 == 0:
             # (epoch+1)*iter_epoch
-            # Fixme move to a function
-            # adding normal image with ground truth boxes
-            img = images[0].detach().cpu().numpy()
-            writer.add_image('image', img, iter_per_epoch)
-            img_gt_boxes_channel_last = np.moveaxis(images[0].detach().cpu().numpy(), 0, -1)
-            img_with_gt_boxes = visualize(img_gt_boxes_channel_last, targets1[0]['boxes'].detach().cpu().numpy(),
-                                          targets1[0]['labels'].detach().cpu().numpy(), category_id_to_name)
-            img_gt_boxes_channel_first = np.moveaxis(img_with_gt_boxes, -1, 0)
-            writer.add_image('image_GT_boxes', img_gt_boxes_channel_first, iter_per_epoch)
-            masks_binary = targets1[0]['masks'].detach().cpu().numpy()
-            maski = np.zeros(shape=masks_binary[0].shape, dtype=np.uint16)
-            for idx, mask in enumerate(masks_binary):
-                maski[mask == 1] = idx + 1
-
-            img_gt_overlay = mask_overlay(img_gt_boxes_channel_last, maski)
-            img_gt_overlay_channel_first = np.moveaxis(img_gt_overlay, -1, 0)
-            writer.add_image('image_GT_masks', img_gt_overlay_channel_first, iter_per_epoch)
-            ##################################################################
-            img_with_output_boxes = visualize(img_gt_boxes_channel_last, outputs[0]['boxes'].detach().cpu().numpy(),
-                                          outputs[0]['labels'].detach().cpu().numpy(), category_id_to_name)
-            img_gt_output_channel_first = np.moveaxis(img_with_output_boxes, -1, 0)
-            writer.add_image('image_output_boxes', img_gt_output_channel_first, iter_per_epoch)
-            masks_binary = outputs[0]['masks'].squeeze().detach().cpu().numpy()
-            maski = np.zeros(shape=masks_binary[0].shape, dtype=np.uint16)
-            for idx, mask in enumerate(masks_binary):
-                maski[mask>0.5] = idx + 1
-
-            img_output_overlay = mask_overlay(img_gt_boxes_channel_last, maski)
-            img_output_overlay_channel_first = np.moveaxis(img_output_overlay, -1, 0)
-            writer.add_image('image_output_masks', img_output_overlay_channel_first, iter_per_epoch)
-
-
+            output_vis_to_tensorboard(images, targets1, outputs, iter_per_epoch, writer)
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
 
@@ -199,9 +138,9 @@ def evaluate(configs, epoch, data_loader, device, writer):
         coco_evaluator.update(res)
 
         # reduce losses over all GPUs for logging purposes
-        loss_dict_reduced = utils.reduce_dict(loss_dict)
+        # loss_dict_reduced = utils.reduce_dict(loss_dict)
 
-        val_loss_dict = Counter(val_loss_dict) + Counter(loss_dict_reduced)
+        # val_loss_dict = Counter(val_loss_dict) + Counter(loss_dict_reduced)
 
     # gather the stats from all processes
 
@@ -210,19 +149,27 @@ def evaluate(configs, epoch, data_loader, device, writer):
     # accumulate predictions from all images
     coco_evaluator.accumulate()
     coco_evaluator.summarize()
+    writer.add_scalar('info/AP_0.5_BOX',coco_evaluator.coco_eval['bbox'].stats[1],epoch)
+    writer.add_scalar('info/AP_0.75_BOX',coco_evaluator.coco_eval['bbox'].stats[2],epoch)
+    writer.add_scalar('info/AR__BOX',coco_evaluator.coco_eval['bbox'].stats[8],epoch)
+
+    writer.add_scalar('info/AP_0.5_SEG',coco_evaluator.coco_eval['segm'].stats[1],epoch)
+    writer.add_scalar('info/AP_0.75_SEG',coco_evaluator.coco_eval['segm'].stats[2],epoch)
+    writer.add_scalar('info/AR__SEG',coco_evaluator.coco_eval['segm'].stats[8],epoch)
+
     # TODO fix loss
-    val_losses_reduced = sum(loss for loss in val_loss_dict.values()) / total_iter_per_epoch
-    loss_str = []
-    for name, meter in val_loss_dict.items():
-        writer.add_scalar('info/' + str(name), float(meter) / total_iter_per_epoch, epoch)
-        loss_str.append(
-            "{}: {}".format(name, str(round(float(meter) / total_iter_per_epoch, 5)))
-        )
+    # val_losses_reduced = sum(loss for loss in val_loss_dict.values()) / total_iter_per_epoch
+    # loss_str = []
+    # for name, meter in val_loss_dict.items():
+    #     writer.add_scalar('info/' + str(name), float(meter) / total_iter_per_epoch, epoch)
+    #     loss_str.append(
+    #         "{}: {}".format(name, str(round(float(meter) / total_iter_per_epoch, 5)))
+    #     )
 
-    writer.add_scalar('info/total_loss', val_losses_reduced, epoch)
+    # writer.add_scalar('info/total_loss', val_losses_reduced, epoch)
 
-    logging.info('{}  finished [{}/{}] loss:{} '.format(header, iter_per_epoch, total_iter_per_epoch,
-                                                        val_losses_reduced) + "\t".join(loss_str))
+    # logging.info('{}  finished [{}/{}] loss:{} '.format(header, iter_per_epoch, total_iter_per_epoch,
+    #                                                     val_losses_reduced) + "\t".join(loss_str))
 
     torch.set_num_threads(n_threads)
     return coco_evaluator
@@ -256,3 +203,33 @@ def visualize(image, bboxes, category_ids, category_id_to_name):
         img = visualize_bbox(img, bbox, class_name)
 
     return img
+
+def output_vis_to_tensorboard(images,targets1,outputs,iter_per_epoch,writer):
+    img = images[0].detach().cpu().numpy()
+    writer.add_image('image', img, iter_per_epoch)
+    img_gt_boxes_channel_last = np.moveaxis(images[0].detach().cpu().numpy(), 0, -1)
+    img_with_gt_boxes = visualize(img_gt_boxes_channel_last, targets1[0]['boxes'].detach().cpu().numpy(),
+                                  targets1[0]['labels'].detach().cpu().numpy(), category_id_to_name)
+    img_gt_boxes_channel_first = np.moveaxis(img_with_gt_boxes, -1, 0)
+    writer.add_image('image_GT_boxes', img_gt_boxes_channel_first, iter_per_epoch)
+    masks_binary = targets1[0]['masks'].detach().cpu().numpy()
+    maski = np.zeros(shape=masks_binary[0].shape, dtype=np.uint16)
+    for idx, mask in enumerate(masks_binary):
+        maski[mask == 1] = idx + 1
+
+    img_gt_overlay = mask_overlay(img_gt_boxes_channel_last, maski)
+    img_gt_overlay_channel_first = np.moveaxis(img_gt_overlay, -1, 0)
+    writer.add_image('image_GT_masks', img_gt_overlay_channel_first, iter_per_epoch)
+    ##################################################################
+    img_with_output_boxes = visualize(img_gt_boxes_channel_last, outputs[0]['boxes'].detach().cpu().numpy(),
+                                      outputs[0]['labels'].detach().cpu().numpy(), category_id_to_name)
+    img_gt_output_channel_first = np.moveaxis(img_with_output_boxes, -1, 0)
+    writer.add_image('image_output_boxes', img_gt_output_channel_first, iter_per_epoch)
+    masks_binary = outputs[0]['masks'].squeeze().detach().cpu().numpy()
+    maski = np.zeros(shape=masks_binary[0].shape, dtype=np.uint16)
+    for idx, mask in enumerate(masks_binary):
+        maski[mask > 0.5] = idx + 1
+
+    img_output_overlay = mask_overlay(img_gt_boxes_channel_last, maski)
+    img_output_overlay_channel_first = np.moveaxis(img_output_overlay, -1, 0)
+    writer.add_image('image_output_masks', img_output_overlay_channel_first, iter_per_epoch)
