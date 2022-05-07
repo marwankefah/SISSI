@@ -42,7 +42,7 @@ def train(configs, snapshot_path):
     # db_train = PennFudanDataset('../data/PennFudanPed', configs.train_transform)
     # db_test = PennFudanDataset('../data/PennFudanPed', configs.val_transform)
 
-    db_train = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.train_transform)
+    db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
 
     trainloader = torch.utils.data.DataLoader(
