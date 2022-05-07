@@ -111,3 +111,4 @@ class GeneralizedRCNN(nn.Module):
             return losses, detections
         else:
             return losses, detections
+

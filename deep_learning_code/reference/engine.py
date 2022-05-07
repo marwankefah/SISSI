@@ -1,7 +1,12 @@
 import math
 import sys
 import time
-
+from typing import Tuple, List, Dict, Optional
+import torch
+from torch import Tensor
+from collections import OrderedDict
+from torchvision.models.detection.roi_heads import fastrcnn_loss
+from torchvision.models.detection.rpn import concat_box_prediction_layers
 import cv2
 import torch
 import numpy as np
@@ -125,7 +130,10 @@ def evaluate(configs, epoch, data_loader, device, writer):
 
         torch.cuda.synchronize()
         with torch.no_grad():
-            losses, outputs = configs.model(images)
+            configs.model.rpn.training = True
+            configs.model.roi_heads.training = True
+
+            loss_dict, outputs = configs.model(images,targets1)
 
         if iter_per_epoch % 20 == 0:
             # (epoch+1)*iter_epoch
@@ -138,9 +146,9 @@ def evaluate(configs, epoch, data_loader, device, writer):
         coco_evaluator.update(res)
 
         # reduce losses over all GPUs for logging purposes
-        # loss_dict_reduced = utils.reduce_dict(loss_dict)
+        loss_dict_reduced = utils.reduce_dict(loss_dict)
 
-        # val_loss_dict = Counter(val_loss_dict) + Counter(loss_dict_reduced)
+        val_loss_dict = Counter(val_loss_dict) + Counter(loss_dict_reduced)
 
     # gather the stats from all processes
 
@@ -149,27 +157,27 @@ def evaluate(configs, epoch, data_loader, device, writer):
     # accumulate predictions from all images
     coco_evaluator.accumulate()
     coco_evaluator.summarize()
-    writer.add_scalar('info/AP_0.5_BOX',coco_evaluator.coco_eval['bbox'].stats[1],epoch)
-    writer.add_scalar('info/AP_0.75_BOX',coco_evaluator.coco_eval['bbox'].stats[2],epoch)
-    writer.add_scalar('info/AR__BOX',coco_evaluator.coco_eval['bbox'].stats[8],epoch)
+    writer.add_scalar('info/AP_0.5_BOX', coco_evaluator.coco_eval['bbox'].stats[1], epoch)
+    writer.add_scalar('info/AP_0.75_BOX', coco_evaluator.coco_eval['bbox'].stats[2], epoch)
+    writer.add_scalar('info/AR__BOX', coco_evaluator.coco_eval['bbox'].stats[8], epoch)
 
-    writer.add_scalar('info/AP_0.5_SEG',coco_evaluator.coco_eval['segm'].stats[1],epoch)
-    writer.add_scalar('info/AP_0.75_SEG',coco_evaluator.coco_eval['segm'].stats[2],epoch)
-    writer.add_scalar('info/AR__SEG',coco_evaluator.coco_eval['segm'].stats[8],epoch)
+    writer.add_scalar('info/AP_0.5_SEG', coco_evaluator.coco_eval['segm'].stats[1], epoch)
+    writer.add_scalar('info/AP_0.75_SEG', coco_evaluator.coco_eval['segm'].stats[2], epoch)
+    writer.add_scalar('info/AR__SEG', coco_evaluator.coco_eval['segm'].stats[8], epoch)
 
     # TODO fix loss
-    # val_losses_reduced = sum(loss for loss in val_loss_dict.values()) / total_iter_per_epoch
-    # loss_str = []
-    # for name, meter in val_loss_dict.items():
-    #     writer.add_scalar('info/' + str(name), float(meter) / total_iter_per_epoch, epoch)
-    #     loss_str.append(
-    #         "{}: {}".format(name, str(round(float(meter) / total_iter_per_epoch, 5)))
-    #     )
+    val_losses_reduced = sum(loss for loss in val_loss_dict.values()) / total_iter_per_epoch
+    loss_str = []
+    for name, meter in val_loss_dict.items():
+        writer.add_scalar('info/' + str(name), float(meter) / total_iter_per_epoch, epoch)
+        loss_str.append(
+            "{}: {}".format(name, str(round(float(meter) / total_iter_per_epoch, 5)))
+        )
 
-    # writer.add_scalar('info/total_loss', val_losses_reduced, epoch)
+    writer.add_scalar('info/total_loss', val_losses_reduced, epoch)
 
-    # logging.info('{}  finished [{}/{}] loss:{} '.format(header, iter_per_epoch, total_iter_per_epoch,
-    #                                                     val_losses_reduced) + "\t".join(loss_str))
+    logging.info('{}  finished [{}/{}] loss:{} '.format(header, iter_per_epoch, total_iter_per_epoch,
+                                                        val_losses_reduced) + "\t".join(loss_str))
 
     torch.set_num_threads(n_threads)
     return coco_evaluator
@@ -204,7 +212,8 @@ def visualize(image, bboxes, category_ids, category_id_to_name):
 
     return img
 
-def output_vis_to_tensorboard(images,targets1,outputs,iter_per_epoch,writer):
+
+def output_vis_to_tensorboard(images, targets1, outputs, iter_per_epoch, writer):
     img = images[0].detach().cpu().numpy()
     writer.add_image('image', img, iter_per_epoch)
     img_gt_boxes_channel_last = np.moveaxis(images[0].detach().cpu().numpy(), 0, -1)
