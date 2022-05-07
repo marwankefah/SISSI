@@ -14,7 +14,7 @@ import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
 from torch.utils.data.dataset import ConcatDataset
 from tqdm import tqdm
-from configs.configs_mean_teacher import *
+from configs.configxs_mean_teacher import *
 from dataloaders.dataset import (omidb_dataset_unlabelled, ddsm_dataset_labelled, BaseFetaDataSets,
                                  TwoStreamBatchSampler)
 from configs.configs_mean_teacher import Configs

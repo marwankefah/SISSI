@@ -18,3 +18,4 @@ numpy==1.21
 click
 pycocotools
 opencv-python
+albumentations

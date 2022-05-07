@@ -11,11 +11,12 @@ import matplotlib.pyplot as plt
 from scipy import ndimage as ndi
 from sklearn.cluster._mean_shift import estimate_bandwidth, MeanShift
 
-from utils.preprocess import fill_holes, imreconstruct
+from utils.preprocess import fill_holes, imreconstruct, imposemin
 import utils.cellpose_utils as cellpose_utils
 from skimage.segmentation import watershed
 from skimage.feature import peak_local_max
 from utils.preprocess import illumination_correction, EGT_Segmentation, mask_overlay
+from utils.seed_detection import seed_detection
 
 cell_type = 'alive'
 data_dir = Path(
@@ -24,7 +25,7 @@ data_dir = Path(
 dead_images_raw = [
     [cv2.imread(str(img)), str(img).split('\\')[-1]] for img in data_dir.iterdir()
 ]
-
+dead_images_raw.remove([None, '.gitignore'])
 for image, cell_name in dead_images_raw:
 
     lookUpTable = np.empty((1, 256), np.uint8)
@@ -60,17 +61,17 @@ for image, cell_name in dead_images_raw:
     # Compute image gradient and percentiles
 
     img1 = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
+    #
+    # # filter to reduce noise
+    # img = cv2.medianBlur(rgb, 3)
 
-    # filter to reduce noise
-    img = cv2.medianBlur(rgb, 3)
-
-    # img2 = cv2.medianBlur(img1, 5)
-    # img3 = cv2.bilateralFilter(img2, 9, 75, 75)
-    # img4 = cv2.adaptiveThreshold(img3, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 29, 0)
-    # img5 = skimage.img_as_ubyte(skimage.morphology.skeletonize(skimage.img_as_bool(img4)))
+    img2 = cv2.medianBlur(img1, 5)
+    img3 = cv2.bilateralFilter(img2, 9, 75, 75)
+    img4 = cv2.adaptiveThreshold(img3, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 29, 0)
+    img5 = skimage.img_as_ubyte(skimage.morphology.skeletonize(skimage.img_as_bool(img4)))
     # img6 = cv2.dilate(img5, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)), iterations=1)
 
-    # cv2.imshow('image', img3)
+    # cv2.imshow('image', img5)
     # cv2.waitKey(0)
 
     clahe = cv2.createCLAHE(clipLimit=0.01, tileGridSize=(16, 16))
@@ -95,60 +96,53 @@ for image, cell_name in dead_images_raw:
     opened_closed_br_image = cv2.bitwise_not(opened_closed_br_image)
 
     SE = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    opening_foreground = cv2.morphologyEx(opened_closed_br_image, cv2.MORPH_OPEN, SE)
+    eroded_foreground = cv2.morphologyEx(opening_foreground, cv2.MORPH_OPEN, SE)
 
-    ret2, th2 = cv2.threshold(opened_closed_br_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    ret2, th2 = cv2.threshold(eroded_foreground, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    coords = peak_local_max(opened_closed_br_image, min_distance=1, footprint=np.ones((20, 20)), labels=th2)
-    #
-    mask = np.zeros(img1.shape, dtype=bool)
-    mask[tuple(coords.T)] = True
+    watershedInput = imposemin(magnitude / 255, cv2.bitwise_or(img5 // 255, th2//255))
+
+    # TODO implement seed instead to get coords(markers)
+    try:
+        mask = seed_detection(cell_gray, th2, sigma0=10, alpha=0.03)
+    except:
+        raise NameError(f"Error for {cell_name} ")
+
     markers, _ = ndi.label(mask)
     overlay = mask_overlay(opened_closed_br_image, markers)
 
-    mask = np.zeros(opened_closed_br_image.shape, dtype=bool)
-    mask[tuple(coords.T)] = True
-    markers, _ = ndi.label(mask)
-    # watershed output #Todo put distance in watershed or image??
-
-    # imposemin(opened_closed_br_image,)
-
-    labels = watershed(opened_closed_br_image, markers, mask=th2)
+    labels = watershed(watershedInput, markers, mask=th2)
 
     # outlines for plotting from cellpose
     outlines = cellpose_utils.masks_to_outlines(labels)
     outX, outY = np.nonzero(outlines)
-    imgout = opened_closed_br_image.copy()
-    imgout = cv2.cvtColor(imgout, cv2.COLOR_GRAY2RGB)
+    imgout = image.copy()
+    # imgout = cv2.cvtColor(imgout, cv2.COLOR_GRAY2RGB)
 
     imgout[outX, outY] = np.array([255, 0, 0])  # pure red
-    fig, axes = plt.subplots(ncols=5, figsize=(20, 6), sharex=True, sharey=True)
-    ax = axes.ravel()
-    ax[0].imshow(cell_clahe, cmap=plt.cm.gray)
-    ax[0].set_title('cell clahe')
+    fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(20, 6))
+    axes[0, 0].imshow(cell_clahe, cmap=plt.cm.gray)
+    axes[0, 0].set_title('cell clahe')
 
-    ax[1].imshow(opened_closed_br_image, cmap=plt.cm.gray)
-    ax[1].set_title('foreground')
+    axes[0, 1].imshow(opened_closed_br_image, cmap=plt.cm.gray)
+    axes[0, 1].set_title('foreground')
 
-    ax[2].imshow(imgout)
-    ax[2].set_title('outlines of objects')
+    axes[0, 2].imshow(eroded_foreground, cmap=plt.cm.gray)
+    axes[0, 2].set_title('eroded_foreground')
 
-    overlay = mask_overlay(img1, labels)
-    ax[3].imshow(overlay)
-    ax[3].set_title('Separated objects')
+    axes[0, 3].imshow(watershedInput, cmap=plt.cm.gray)
+    axes[0, 3].set_title('WaterShed input')
 
+    axes[1, 0].imshow(overlay)
+    axes[1, 0].set_title('seed detection')
 
-    cv2.imshow('clahe', cell_clahe)
-    cv2.imshow('mag', magnitude)
-    cv2.imshow('angle', angle)
-    cv2.imshow('image', img1)
-    cv2.imshow('opening_by_reconstruction', opened_by_reconstruction)
-    cv2.imshow('close_open_by_reconstruction', opened_closed_br_image)
-    cv2.imshow('overaly', overlay)
-    cv2.imshow('otsu', th2)
-    cv2.waitKey(0)
+    axes[1, 1].imshow(imgout)
+    axes[1, 1].set_title('outlines of objects')
 
-    for a in ax:
-        a.set_axis_off()
+    overlay = mask_overlay(image, labels)
+    axes[1, 2].imshow(overlay)
+    axes[1, 2].set_title('Separated objects')
 
     fig.tight_layout()
 

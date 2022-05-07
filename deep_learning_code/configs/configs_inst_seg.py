@@ -9,12 +9,19 @@ import os
 import torch.optim as optim
 from monai.transforms.utility.dictionary import Lambdad
 from torch.nn.modules.loss import CrossEntropyLoss, BCELoss
-import detection.transforms as T
 
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+# from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+# from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor, MaskRCNN_ResNet50_FPN_Weights
 import torchvision
 import monai
 import segmentation_models_pytorch as smp
+from torchvision.models.resnet import ResNet50_Weights
+from torchvision.models.detection.mask_rcnn import MaskRCNN_ResNet50_FPN_Weights
+
+import reference.transforms as T
+from torchvision_our.models.detection.faster_rcnn import FastRCNNPredictor
+from torchvision_our.models.detection.mask_rcnn import MaskRCNNPredictor, maskrcnn_resnet50_fpn
+
 
 from monai.transforms import (
     Activations,
@@ -43,8 +50,6 @@ from monai.metrics import DiceMetric
 
 import torch
 import numpy as np
-from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor, MaskRCNN_ResNet50_FPN_Weights
-from torchvision.models.resnet import ResNet50_Weights
 
 
 class Configs:
@@ -252,7 +257,7 @@ class Configs:
 
     def create_mask_rcnn(self, num_classes):
 
-        model = torchvision.models.detection.maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.COCO_V1,weights_backbone=ResNet50_Weights.IMAGENET1K_V1)
+        model = maskrcnn_resnet50_fpn(pretrained=True)
 
         # get number of input features for the classifier
         in_features = model.roi_heads.box_predictor.cls_score.in_features

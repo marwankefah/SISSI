@@ -1,15 +1,104 @@
-from detection.engine import train_one_epoch, evaluate
+import os
+
 from torch.backends import cudnn
 import utils
 import torch
+import argparse
+import logging
+import os
+import random
+import shutil
+import sys
+import time
+from monai.data.utils import decollate_batch
+from tensorboardX import SummaryWriter
+import numpy as np
+import torch
+import torch.backends.cudnn as cudnn
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from configs.configs import *
+from dataloaders.dataset import (ddsm_dataset_labelled, BaseFetaDataSets, RandomGenerator, ResizeTransform,
+                                 TwoStreamBatchSampler)
+from configs.configs import Configs
+from monai.visualize import plot_2d_or_3d_image
+from medpy import metric
+from PIL import ImageFile
 
 from configs.configs_inst_seg import Configs
 
-from dataloaders.instance_seg_dataset import PennFudanDataset
+from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset
 
-import detection.utils as utils
+import reference.utils as utils
+from reference.engine import train_one_epoch, evaluate
 
-def main():
+
+def train(configs, snapshot_path):
+    configs.train_writer = SummaryWriter(snapshot_path + '/log')
+    configs.val_writer = SummaryWriter(snapshot_path + '/log_val')
+
+    configs.model.to(configs.device)
+
+    # db_train = PennFudanDataset('../data/PennFudanPed', configs.train_transform)
+    # db_test = PennFudanDataset('../data/PennFudanPed', configs.val_transform)
+
+    db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
+    db_test = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.val_transform)
+
+    trainloader = torch.utils.data.DataLoader(
+        db_train, batch_size=1, shuffle=True, num_workers=1,
+        collate_fn=utils.collate_fn)
+
+    valloader = torch.utils.data.DataLoader(
+        db_test, batch_size=1, shuffle=False, num_workers=1,
+        collate_fn=utils.collate_fn)
+
+    configs.model.train()
+
+    writer = configs.train_writer
+    writer_val = configs.val_writer
+
+    logging.info("{} iterations per epoch".format(len(trainloader)))
+
+    iter_num = 0
+
+    max_epoch = configs.max_iterations // len(trainloader) + 1
+    iterator = tqdm(range(max_epoch), ncols=70)
+    best_AP_75_all = 0
+
+    for epoch_num in iterator:
+
+        train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
+
+        coco_evaulator = evaluate(configs.model, epoch_num, valloader, device=configs.device, writer=writer_val)
+
+        # AP iou 0.75--all bbox
+        AP_75_all = coco_evaulator.coco_eval['bbox'].stats[2]
+
+        if AP_75_all > best_AP_75_all:
+            best_AP_75_all = AP_75_all
+            save_mode_path = os.path.join(snapshot_path,
+                                          'epoch_{}_val_AP_75_all_{}.pth'.format(
+                                              epoch_num, round(best_AP_75_all, 4)))
+            logging.info('saving model with best performance {}'.format(best_AP_75_all))
+            utils.save_on_master({
+                'model': configs.model.state_dict(),
+                # 'optimizer': configs.optimizer.state_dict(),
+                # 'lr_scheduler': configs.lr_scheduler.state_dict(),
+                'epoch': epoch_num}, save_mode_path)
+
+        if iter_num >= configs.max_iterations:
+            break
+        configs.model.train()
+        logging.info('{} epoch finished'.format(epoch_num + 1))
+
+    writer.close()
+    writer_val.close()
+    return "Training Finished!"
+
+
+if __name__ == "__main__":
+
     configs = Configs('./configs/mask_rcnn.ini')
 
     if not configs.deterministic:
@@ -19,41 +108,27 @@ def main():
         cudnn.benchmark = False
         cudnn.deterministic = True
 
-    # our dataset has two classes only - background and person
-    num_classes = 2
-    # use our dataset and defined transformations
-    dataset = PennFudanDataset('../data/PennFudanPed', configs.train_transform)
-    dataset_test = PennFudanDataset('../data/PennFudanPed', configs.val_transform)
+    random.seed(configs.seed)
+    np.random.seed(configs.seed)
+    torch.manual_seed(configs.seed)
+    torch.cuda.manual_seed(configs.seed)
 
-    # split the dataset in train and test set
-    indices = torch.randperm(len(dataset)).tolist()
-    dataset = torch.utils.data.Subset(dataset, indices[:-50])
-    dataset_test = torch.utils.data.Subset(dataset_test, indices[-50:])
+    log_time = int(time.time())
 
-    # define training and validation data loaders
-    data_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=2, shuffle=True, num_workers=4,
-        collate_fn=utils.collate_fn)
+    snapshot_path = "../model/{}_labelled/{}/{}".format(
+        configs.exp, configs.model_name, log_time)
 
-    data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=1, shuffle=False, num_workers=4,
-        collate_fn=utils.collate_fn)
+    if not os.path.exists(snapshot_path):
+        os.makedirs(snapshot_path)
 
-    # get the model using our helper function
-    # move model to the right device
-    configs.model.to(configs.device)
+    if os.path.exists(snapshot_path + '/code'):
+        shutil.rmtree(snapshot_path + '/code')
 
-    # let's train it for 10 epochs
-    num_epochs = 10
+    shutil.copytree('.', snapshot_path + '/code',
+                    shutil.ignore_patterns(['.git', '__pycache__']))
 
-    for epoch in range(num_epochs):
-        # train for one epoch, printing every 10 iterations
-        train_one_epoch(configs.model, configs.optimizer, data_loader, configs.device, epoch, print_freq=10)
-        evaluate(configs.model, data_loader_test, device=configs.device)
-
-    print("That's it!")
-
-
-
-if __name__ == "__main__":
-    main()
+    logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
+                        format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+    logging.info(str(vars(configs)))
+    train(configs, snapshot_path)
