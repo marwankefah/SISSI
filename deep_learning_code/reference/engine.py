@@ -70,7 +70,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
 
         if iter_epoch % 20 == 0:
             # (epoch+1)*iter_epoch
-            output_vis_to_tensorboard(images, targets, outputs, iter_epoch, writer)
+            output_vis_to_tensorboard(images, targets, outputs, (epoch+1)*iter_epoch, writer)
 
         train_loss_dict = Counter(train_loss_dict) + Counter(loss_dict_reduced)
 
@@ -137,7 +137,7 @@ def evaluate(configs, epoch, data_loader, device, writer):
 
         if iter_per_epoch % 20 == 0:
             # (epoch+1)*iter_epoch
-            output_vis_to_tensorboard(images, targets1, outputs, iter_per_epoch, writer)
+            output_vis_to_tensorboard(images, targets1, outputs, (epoch+1)*iter_per_epoch, writer)
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
 

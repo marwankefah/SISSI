@@ -260,7 +260,7 @@ class Configs:
 
     def create_mask_rcnn(self, num_classes):
 
-        model = maskrcnn_resnet50_fpn(pretrained_backbone=True, min_size=500, max_size=800)
+        model = maskrcnn_resnet50_fpn(pretrained_backbone=True)
 
         # get number of input features for the classifier
         in_features = model.roi_heads.box_predictor.cls_score.in_features
