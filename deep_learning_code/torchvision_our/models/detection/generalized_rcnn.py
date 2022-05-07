@@ -82,6 +82,7 @@ class GeneralizedRCNN(nn.Module):
         if targets is not None:
             for target_idx, target in enumerate(targets):
                 boxes = target["boxes"]
+                #TODO what if it is a line?
                 degenerate_boxes = boxes[:, 2:] <= boxes[:, :2]
                 if degenerate_boxes.any():
                     # print the first degenerate box

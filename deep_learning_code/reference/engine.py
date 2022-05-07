@@ -1,6 +1,8 @@
 import math
 import sys
 import time
+
+import cv2
 import torch
 import numpy as np
 import logging
@@ -8,6 +10,13 @@ from reference.coco_utils import get_coco_api_from_dataset
 from reference.coco_eval import CocoEvaluator
 import reference.utils as utils
 from collections import Counter
+
+from utils.preprocess import mask_overlay
+
+category_ids = [1]
+# We will use the mapping from category_id to the class name
+# to visualize the class label for the bounding box on the image
+category_id_to_name = {1: 'cell'}
 
 
 def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
@@ -27,7 +36,6 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
 
     for iter_epoch, (images, targets) in enumerate(data_loader):
         images = list(image.to(configs.device) for image in images)
-
 
         targets = [{k: v.to(configs.device) for k, v in t.items()} for t in targets]
 
@@ -55,6 +63,28 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
 
         writer.add_scalar('info/lr', configs.optimizer.param_groups[0]["lr"], epoch)
 
+        if iter_epoch % 20 == 0:
+            # (epoch+1)*iter_epoch
+            # Fixme move to a function
+            # adding normal image with ground truth boxes
+            img = images[0].detach().cpu().numpy()
+            writer.add_image('image', img, iter_epoch)
+            img_gt_boxes_channel_last = np.moveaxis(images[0].detach().cpu().numpy(), 0, -1)
+            img_with_gt_boxes = visualize(img_gt_boxes_channel_last, targets[0]['boxes'].detach().cpu().numpy(),
+                                          targets[0]['labels'].detach().cpu().numpy(), category_id_to_name)
+            img_gt_boxes_channel_first = np.moveaxis(img_with_gt_boxes, -1, 0)
+            writer.add_image('image_GT_boxes', img_gt_boxes_channel_first, iter_epoch)
+            masks_binary = targets[0]['masks'].detach().cpu().numpy()
+            maski = np.zeros(shape=masks_binary[0].shape,dtype=np.uint16)
+            for idx, mask in enumerate(masks_binary):
+                maski[mask == 1] = idx + 1
+
+            img_gt_overlay = mask_overlay(img_gt_boxes_channel_last, maski)
+            img_gt_overlay_channel_first = np.moveaxis(img_gt_overlay, -1, 0)
+            writer.add_image('image_GT_masks', img_gt_overlay_channel_first, iter_epoch)
+
+            ##################################################################
+
         train_loss_dict = Counter(train_loss_dict) + Counter(loss_dict_reduced)
 
         loss_str = []
@@ -67,13 +97,15 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
                                                   round(loss_value, 4)) + "\t".join(loss_str))
 
         # TODO add images and predictions and masks to tensorboard
-    train_losses_reduced = sum(loss for loss in loss_dict_reduced.values()) / total_iter_per_epoch
+    train_losses_reduced = sum(loss for loss in train_loss_dict.values()) / total_iter_per_epoch
     loss_str = []
     for name, meter in train_loss_dict.items():
         writer.add_scalar('info/' + str(name), float(meter) / total_iter_per_epoch, epoch)
         loss_str.append(
             "{}: {}".format(name, str(round(float(meter) / total_iter_per_epoch, 5)))
         )
+
+    writer.add_scalar('info/total_loss', train_losses_reduced, epoch)
 
     logging.info('{}  finished [{}/{}] lr: {} loss:{} '.format(header, iter_epoch, total_iter_per_epoch,
                                                                configs.optimizer.param_groups[0]["lr"],
@@ -92,7 +124,7 @@ def _get_iou_types(model):
 
 
 @torch.no_grad()
-def evaluate(model,epoch, data_loader, device, writer):
+def evaluate(model, epoch, data_loader, device, writer):
     n_threads = torch.get_num_threads()
     # FIXME (i need someone to fix me ) remove this and make paste_masks_in_image run on the GPU
     torch.set_num_threads(1)
@@ -132,7 +164,7 @@ def evaluate(model,epoch, data_loader, device, writer):
     coco_evaluator.accumulate()
     coco_evaluator.summarize()
 
-    val_losses_reduced = sum(loss for loss in loss_dict_reduced.values()) / total_iter_per_epoch
+    val_losses_reduced = sum(loss for loss in val_loss_dict.values()) / total_iter_per_epoch
     loss_str = []
     for name, meter in val_loss_dict.items():
         writer.add_scalar('info/' + str(name), float(meter) / total_iter_per_epoch, epoch)
@@ -140,8 +172,40 @@ def evaluate(model,epoch, data_loader, device, writer):
             "{}: {}".format(name, str(round(float(meter) / total_iter_per_epoch, 5)))
         )
 
+    writer.add_scalar('info/total_loss', val_losses_reduced, epoch)
+
     logging.info('{}  finished [{}/{}] loss:{} '.format(header, iter_per_epoch, total_iter_per_epoch,
-                                                               val_losses_reduced) + "\t".join(loss_str))
+                                                        val_losses_reduced) + "\t".join(loss_str))
 
     torch.set_num_threads(n_threads)
     return coco_evaluator
+
+
+def visualize_bbox(img, bbox, class_name, color=(150, 0, 0), thickness=1):
+    """Visualizes a single bounding box on the image"""
+    x_min, y_min, x_max, y_max = bbox
+    x_min, x_max, y_min, y_max = int(x_min), int(x_max), int(y_min), int(y_max)
+
+    cv2.rectangle(img, (x_min, y_min), (x_max, y_max), color=color, thickness=thickness)
+
+    ((text_width, text_height), _) = cv2.getTextSize(class_name, cv2.FONT_HERSHEY_SIMPLEX, 0.35, 1)
+    cv2.rectangle(img, (x_min, y_min - int(1.3 * text_height)), (x_min + text_width, y_min), color, -1)
+    cv2.putText(
+        img,
+        text=class_name,
+        org=(x_min, y_min - int(0.3 * text_height)),
+        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+        fontScale=0.35,
+        color=(150, 150, 150),
+        lineType=cv2.LINE_AA,
+    )
+    return img
+
+
+def visualize(image, bboxes, category_ids, category_id_to_name):
+    img = image.copy()
+    for bbox, category_id in zip(bboxes, category_ids):
+        class_name = category_id_to_name[category_id]
+        img = visualize_bbox(img, bbox, class_name)
+
+    return img

@@ -43,14 +43,14 @@ def train(configs, snapshot_path):
     # db_test = PennFudanDataset('../data/PennFudanPed', configs.val_transform)
 
     db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
-    db_test = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.val_transform)
+    db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
 
     trainloader = torch.utils.data.DataLoader(
-        db_train, batch_size=1, shuffle=True, num_workers=1,
+        db_train, batch_size=1, shuffle=True, num_workers=0,
         collate_fn=utils.collate_fn)
 
     valloader = torch.utils.data.DataLoader(
-        db_test, batch_size=1, shuffle=False, num_workers=1,
+        db_test, batch_size=1, shuffle=False, num_workers=0,
         collate_fn=utils.collate_fn)
 
     configs.model.train()

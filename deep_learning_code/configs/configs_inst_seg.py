@@ -22,7 +22,6 @@ import reference.transforms as T
 from torchvision_our.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision_our.models.detection.mask_rcnn import MaskRCNNPredictor, maskrcnn_resnet50_fpn
 
-
 from monai.transforms import (
     Activations,
     AddChanneld,
@@ -221,7 +220,6 @@ class Configs:
             ]
         )
 
-
         self.val_transform = Compose(
             [
                 LoadImaged(keys=["image", "label"], reader=image_loader),
@@ -238,8 +236,8 @@ class Configs:
                 EnsureTyped(keys=["image", "label"])
             ])
 
-        self.train_transform=self.get_transform(True)
-        self.val_transform= self.get_transform(False)
+        self.train_transform = self.get_transform(True)
+        self.val_transform = self.get_transform(False)
 
         self.y_pred_trans = Compose(
             [EnsureType(), Activations(softmax=True), AsDiscrete(argmax=True, to_onehot=self.num_classes)])
@@ -247,7 +245,6 @@ class Configs:
         self.y_trans = AsDiscrete(threshold=0.1, to_onehot=self.num_classes)
 
         self.dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
-
 
     def update_lr(self, iter_num):
         if self.optim.lower() == 'sgd':
@@ -257,7 +254,7 @@ class Configs:
 
     def create_mask_rcnn(self, num_classes):
 
-        model = maskrcnn_resnet50_fpn(pretrained=True)
+        model = maskrcnn_resnet50_fpn(pretrained=True, min_size=500, max_size=800)
 
         # get number of input features for the classifier
         in_features = model.roi_heads.box_predictor.cls_score.in_features
@@ -274,7 +271,7 @@ class Configs:
 
         return model
 
-    def get_transform(self,train):
+    def get_transform(self, train):
         transforms = []
         transforms.append(T.ToTensor())
         if train:

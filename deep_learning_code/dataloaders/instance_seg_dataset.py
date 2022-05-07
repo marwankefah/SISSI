@@ -5,13 +5,13 @@ from PIL import Image
 
 
 class cell_pose_dataset(torch.utils.data.Dataset):
-    def __init__(self, root,split, transforms):
+    def __init__(self, root, split, transforms):
         self.root = root
         self.transforms = transforms
-        self.split=split
+        self.split = split
         # load all image files, sorting them to
         # ensure that they are aligned
-        all = os.listdir(os.path.join(root,split))
+        all = os.listdir(os.path.join(root, split))
         self.imgs = list(sorted([string for string in all if string.endswith("img.png")]))
         self.masks = list(sorted([string for string in all if string.endswith("masks.png")]))
 
@@ -23,10 +23,10 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         # note that we haven't converted the mask to RGB,
         # because each color corresponds to a different instance
         # with 0 being background
-        print(img.size,)
 
         mask = Image.open(mask_path)
         # convert the PIL Image into a numpy array
+
         mask = np.array(mask)
         # instances are encoded as different colors
         obj_ids = np.unique(mask)
@@ -37,6 +37,8 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         # of binary masks
         masks = mask == obj_ids[:, None, None]
 
+        # print(img_path, idx, img.size, masks.shape)
+
         # get bounding box coordinates for each mask
         num_objs = len(obj_ids)
         boxes = []
@@ -46,7 +48,9 @@ class cell_pose_dataset(torch.utils.data.Dataset):
             xmax = np.max(pos[1])
             ymin = np.min(pos[0])
             ymax = np.max(pos[0])
-            boxes.append([xmin, ymin, xmax, ymax])
+            #checking degenerated boxes or ugly boxes
+            if xmin < xmax and ymin < ymax:
+                boxes.append([xmin, ymin, xmax, ymax])
 
         # convert everything into a torch.Tensor
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
