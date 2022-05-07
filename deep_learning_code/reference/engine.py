@@ -11,7 +11,7 @@ from reference.coco_eval import CocoEvaluator
 import reference.utils as utils
 from collections import Counter
 
-from utils.preprocess import mask_overlay
+from reference.preprocess import mask_overlay
 
 category_ids = [1]
 # We will use the mapping from category_id to the class name
