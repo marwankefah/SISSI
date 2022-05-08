@@ -27,12 +27,11 @@ from PIL import ImageFile
 
 from configs.configs_inst_seg import Configs
 
-from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset
+from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset,chrisi_dataset
 
 import reference.utils as utils
 from reference.engine import train_one_epoch, evaluate,test
 
-from deep_learning_code.dataloaders.instance_seg_dataset import chrisi_dataset
 
 
 def train(configs, snapshot_path):
@@ -52,7 +51,6 @@ def train(configs, snapshot_path):
     alive_data_loader = torch.utils.data.DataLoader(
         db_chrisi_alive, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
-    test(configs, 1, alive_data_loader, configs.device, configs.alive_writer)  # AP iou 0.75--all bbox
 
     trainloader = torch.utils.data.DataLoader(
         db_train, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
