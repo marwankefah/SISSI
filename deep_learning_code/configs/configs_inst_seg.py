@@ -75,6 +75,8 @@ class Configs:
 
         self.multi_class = config_file.getboolean('network', 'multi_class', fallback=True)
 
+        self.train_mask = config_file.getboolean('network', 'train_mask', fallback=False)
+
         self.optim = config_file.get('network', 'optim', fallback='adam')
 
         self.lr_step_size = config_file.getfloat('network', 'lr_step_size', fallback=8)

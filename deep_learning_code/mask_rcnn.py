@@ -77,11 +77,9 @@ def train(configs, snapshot_path):
 
         train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
         configs.lr_scheduler.step()
-        coco_evaulator = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
+        AP_75_all = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
         test(configs, epoch_num, alive_data_loader, configs.device, configs.alive_writer )        # AP iou 0.75--all bbox
-
-        AP_75_all = coco_evaulator.coco_eval['bbox'].stats[2]
 
         if AP_75_all > best_AP_75_all:
             best_AP_75_all = AP_75_all

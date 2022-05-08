@@ -50,6 +50,9 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
+        if not configs.train_mask:
+            loss_dict_reduced.pop('loss_mask')
+
         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
         loss_value = losses_reduced.item()
@@ -180,7 +183,7 @@ def evaluate(configs, epoch, data_loader, device, writer):
                                                         val_losses_reduced) + "\t".join(loss_str))
 
     torch.set_num_threads(n_threads)
-    return coco_evaluator
+    return coco_evaluator.coco_eval['bbox'].stats[2]
 
 def test(configs, epoch, data_loader, device, writer):
     n_threads = torch.get_num_threads()
