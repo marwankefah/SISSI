@@ -4,6 +4,32 @@ import torch
 from PIL import Image
 
 
+class chrisi_dataset(torch.utils.data.Dataset):
+    def __init__(self, root, split, transforms):
+        self.root = root
+        self.transforms = transforms
+        self.split = split
+        # load all image files, sorting them to
+        # ensure that they are aligned
+
+        all = os.listdir(os.path.join(root, split))
+        self.imgs = list(sorted([string for string in all if string.endswith(".jpg")]))
+
+    def __getitem__(self, idx):
+        # load images and masks
+        img_path = os.path.join(self.root, self.split, self.imgs[idx])
+        img = Image.open(img_path).convert("RGB")
+
+        target=None
+        if self.transforms is not None:
+            img, target = self.transforms(img, target)
+
+        return img, target
+
+    def __len__(self):
+        return len(self.imgs)
+
+
 class cell_pose_dataset(torch.utils.data.Dataset):
     def __init__(self, root, split, transforms):
         self.root = root

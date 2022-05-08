@@ -61,6 +61,8 @@ class Configs:
         self.chrisi_cells_root_path = config_file.get('path', 'chrisi_cells_root_path', fallback='../data/FETA/')
         self.chrisi_cells_img_path = config_file.get('path', 'chrisi_cells_img_path', fallback='../data/FETA/')
 
+        self.model_output_path = config_file.get('path', 'model_output_path', fallback='..')
+
         self.linux_gpu_id = config_file.get('path', 'linux_gpu_id', fallback=0)
         self.linux = config_file.getboolean('path', 'linux', fallback=False)
         self.model_path = config_file.get('path', 'model_path', fallback='')

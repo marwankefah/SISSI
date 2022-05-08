@@ -30,12 +30,15 @@ from configs.configs_inst_seg import Configs
 from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset
 
 import reference.utils as utils
-from reference.engine import train_one_epoch, evaluate
+from reference.engine import train_one_epoch, evaluate,test
+
+from deep_learning_code.dataloaders.instance_seg_dataset import chrisi_dataset
 
 
 def train(configs, snapshot_path):
     configs.train_writer = SummaryWriter(snapshot_path + '/log')
     configs.val_writer = SummaryWriter(snapshot_path + '/log_val')
+    configs.alive_writer = SummaryWriter(snapshot_path + '/log_alive')
 
     configs.model.to(configs.device)
 
@@ -44,6 +47,12 @@ def train(configs, snapshot_path):
 
     db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
+    db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, 'alive', configs.val_transform)
+
+    alive_data_loader = torch.utils.data.DataLoader(
+        db_chrisi_alive, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
+        collate_fn=utils.collate_fn)
+    test(configs, 1, alive_data_loader, configs.device, configs.alive_writer)  # AP iou 0.75--all bbox
 
     trainloader = torch.utils.data.DataLoader(
         db_train, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
@@ -63,7 +72,7 @@ def train(configs, snapshot_path):
     iter_num = 0
 
     max_epoch = configs.max_iterations // len(trainloader) + 1
-    iterator = tqdm(range(configs.start_epoch,max_epoch), ncols=70)
+    iterator = tqdm(range(configs.start_epoch, max_epoch), ncols=70)
     best_AP_75_all = configs.best_performance
 
     for epoch_num in iterator:
@@ -72,7 +81,8 @@ def train(configs, snapshot_path):
         configs.lr_scheduler.step()
         coco_evaulator = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
-        # AP iou 0.75--all bbox
+        test(configs, epoch_num, alive_data_loader, configs.device, configs.alive_writer )        # AP iou 0.75--all bbox
+
         AP_75_all = coco_evaulator.coco_eval['bbox'].stats[2]
 
         if AP_75_all > best_AP_75_all:
@@ -86,7 +96,7 @@ def train(configs, snapshot_path):
                 'optimizer': configs.optimizer.state_dict(),
                 'lr_scheduler': configs.lr_scheduler.state_dict(),
                 'epoch': epoch_num,
-                'best_performance':best_AP_75_all},save_mode_path)
+                'best_performance': best_AP_75_all}, save_mode_path)
 
         if iter_num >= configs.max_iterations:
             break
@@ -116,7 +126,7 @@ if __name__ == "__main__":
 
     log_time = int(time.time())
 
-    snapshot_path = "../model/{}_labelled/{}/{}".format(
+    snapshot_path = configs.model_output_path + "model/{}_labelled/{}/{}".format(
         configs.exp, configs.model_name, log_time)
 
     if not os.path.exists(snapshot_path):
