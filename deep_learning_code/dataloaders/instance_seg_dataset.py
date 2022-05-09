@@ -25,7 +25,12 @@ class chrisi_dataset(torch.utils.data.Dataset):
 
         target = None
         if self.transforms is not None:
-            img, target = self.transforms(img, target)
+          img_np = np.array(img)
+          if not img_np.dtype == np.uint8:
+            logging.info("Error: Image is not of type np.uint8?")
+            raise
+          img_np = img_np.astype(np.float32) / 255
+          img = self.transforms(image=img_np)['image']
 
         return img, target
 
