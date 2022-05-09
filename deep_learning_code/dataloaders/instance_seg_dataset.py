@@ -21,7 +21,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         # load images and masks
         img_path = os.path.join(self.root, self.split, self.imgs[idx])
-        img = Image.open(img_path).convert("RGB")
+        img = cv2.imread(img_path, cv2.IMREAD_COLOR)
 
         target = None
         if self.transforms is not None:
@@ -51,9 +51,8 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         img_path = os.path.join(self.root, self.split, self.imgs[idx])
         mask_path = os.path.join(self.root, self.split, self.masks[idx])
 
-        img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = np.stack((img,)*3, axis=-1)
+        img = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        # img = np.stack((img,) * 3, axis=-1)
 
         # note that we haven't converted the mask to RGB,
         # because each color corresponds to a different instance
@@ -61,8 +60,21 @@ class cell_pose_dataset(torch.utils.data.Dataset):
 
         mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
         # convert the PIL Image into a numpy array
-        mask = np.array(mask)
+        mask = np.array(mask, np.int16)
+        # mask = np.array(mask)
+        target = {}
+        if self.transforms is not None:
+            img_np = np.array(img)
+            if not img_np.dtype == np.uint8:
+                logging.info("Error: Image is not of type np.uint8?")
+                raise
+            img_np = img_np.astype(np.float32) / 255
+            result = self.transforms(
+                image=img_np, mask=mask)
 
+        # check images/mask shapes before  masks [N, H, W], make mask channel first in tensor
+        img = result['image']
+        mask = np.asarray(result['mask'])
         # instances are encoded as different colors
         obj_ids = np.unique(mask)
         # first id is the background, so remove it
@@ -71,10 +83,6 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         # split the color-encoded mask into a set
         # of binary masks
         masks = mask == obj_ids[:, None, None]
-
-        # print(img_path, idx, img.size, masks.shape)
-
-        # get bounding box coordinates for each mask
         num_objs = len(obj_ids)
         boxes = []
         invalid_ids = []
@@ -90,29 +98,9 @@ class cell_pose_dataset(torch.utils.data.Dataset):
             else:
                 invalid_ids.append(i)
 
+        masks = np.delete(masks, invalid_ids, axis=0)
+
         labels = torch.ones((num_objs - len(invalid_ids),), dtype=torch.int64)
-        mask_channel_first = np.delete(masks, invalid_ids, axis=0)
-        # change channels last to channels first format
-        mask_channel_first = [mask_channel_first[i].astype(
-            np.float32) for i in range(len(mask_channel_first))]
-
-        target = {}
-        if self.transforms is not None:
-            img_np = np.array(img)
-            if not img_np.dtype == np.uint8:
-                logging.info("Error: Image is not of type np.uint8?")
-                raise
-            img_np = img_np.astype(np.float32) / 255
-            result = self.transforms(
-                image=img_np, masks=mask_channel_first, bboxes=boxes,
-                class_labels=np.array(labels))
-
-        # check images/mask shapes before  masks [N, H, W], make mask channel first in tensor
-        img = result['image']
-        boxes = result['bboxes']
-        masks = result['masks']
-
-        labels = torch.ones((len(boxes),), dtype=torch.int64)
 
         # convert everything into a torch.Tensor
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
@@ -127,6 +115,7 @@ class cell_pose_dataset(torch.utils.data.Dataset):
             area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
         else:
             area = boxes
+
         target["boxes"] = boxes
         target["labels"] = labels
         target["masks"] = masks

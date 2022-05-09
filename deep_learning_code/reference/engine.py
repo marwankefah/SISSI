@@ -73,7 +73,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
 
         if iter_epoch % 20 == 0:
             # (epoch+1)*iter_epoch
-            output_vis_to_tensorboard(images, targets, outputs, (epoch+1)*iter_epoch, writer)
+            output_vis_to_tensorboard(images, targets, outputs, (epoch + 1) * iter_epoch, writer)
 
         train_loss_dict = Counter(train_loss_dict) + Counter(loss_dict_reduced)
 
@@ -136,11 +136,11 @@ def evaluate(configs, epoch, data_loader, device, writer):
             configs.model.rpn.training = True
             configs.model.roi_heads.training = True
 
-            loss_dict, outputs = configs.model(images,targets1)
+            loss_dict, outputs = configs.model(images, targets1)
 
         if iter_per_epoch % 20 == 0:
             # (epoch+1)*iter_epoch
-            output_vis_to_tensorboard(images, targets1, outputs, (epoch+1)*iter_per_epoch, writer)
+            output_vis_to_tensorboard(images, targets1, outputs, (epoch + 1) * iter_per_epoch, writer)
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
 
@@ -185,6 +185,7 @@ def evaluate(configs, epoch, data_loader, device, writer):
     torch.set_num_threads(n_threads)
     return coco_evaluator.coco_eval['bbox'].stats[2]
 
+
 def test(configs, epoch, data_loader, device, writer):
     n_threads = torch.get_num_threads()
     # FIXME (i need someone to fix me ) remove this and make paste_masks_in_image run on the GPU
@@ -203,7 +204,7 @@ def test(configs, epoch, data_loader, device, writer):
 
         if iter_per_epoch % 10 == 0:
             # (epoch+1)*iter_epoch
-            output_vis_to_tensorboard(images, outputs, outputs, (epoch+1)*iter_per_epoch, writer)
+            output_vis_to_tensorboard(images, outputs, outputs, (epoch + 1) * iter_per_epoch, writer)
 
     torch.set_num_threads(n_threads)
 

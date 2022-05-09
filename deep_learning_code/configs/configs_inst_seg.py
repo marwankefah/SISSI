@@ -324,13 +324,16 @@ class Configs:
     def get_transform(self, train):
         if train:
             transforms = A.Compose([
-                A.PadIfNeeded(min_width=200, min_height=200, border_mode=0, value=0, mask_value=0),
-                A.RandomCrop(width=200, height=200),
+                A.Resize(self.patch_size[0], self.patch_size[1]),
+                # A.RandomCrop(width=self.patch_size[0]//2, height=self.patch_size[1]//2),
+                A.ChannelShuffle(),
+                A.Blur(),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
-                A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1),
+                A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1,border_mode=0, value=0, mask_value=0),
                 ToTensorV2(),
-            ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=["class_labels"]))
+            ])
+              #  ,bbox_params={'format':'pascal_voc', 'min_area': 0, 'min_visibility': 0, 'label_fields': ['category_id']} )
         else:
             transforms = A.Compose(
                 [A.Resize(self.patch_size[0], self.patch_size[1]),
