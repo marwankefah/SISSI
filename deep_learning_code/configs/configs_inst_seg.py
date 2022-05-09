@@ -329,7 +329,7 @@ class Configs:
                 A.VerticalFlip(p=0.5),
                 A.ShiftScaleRotate(),
                 ToTensorV2(),
-            ])
+            ],bbox_params=A.BboxParams(format='pascal_voc',label_fields=["class_labels"]))
         else:
             transforms = A.Compose(
                 [A.Resize(self.patch_size[0], self.patch_size[1]),

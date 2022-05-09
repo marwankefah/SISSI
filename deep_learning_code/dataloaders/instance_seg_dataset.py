@@ -81,10 +81,16 @@ class cell_pose_dataset(torch.utils.data.Dataset):
             if xmin < xmax and ymin < ymax:
                 boxes.append([xmin, ymin, xmax, ymax])
 
+        labels = torch.ones((num_objs,), dtype=torch.int64)
+
+        if self.transforms is not None:
+            img, target = self.transforms(
+                image=np.array(img), mask=np.array(masks), bboxes=boxes,class_labels=np.array(labels))
+        else:
+            target = {}
         # convert everything into a torch.Tensor
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         # there is only one class
-        labels = torch.ones((num_objs,), dtype=torch.int64)
         masks = torch.as_tensor(masks, dtype=torch.uint8)
 
         image_id = torch.tensor([idx])
@@ -92,12 +98,7 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         # suppose all instances are not crowd
         iscrowd = torch.zeros((num_objs,), dtype=torch.int64)
 
-        if self.transforms is not None:
-            img, target = self.transforms(
-                image=np.array(img), mask=masks, bboxes=boxes)
 
-        else:
-            target = {}
         # target["boxes"] = boxes
         target["labels"] = labels
         # target["masks"] = masks
