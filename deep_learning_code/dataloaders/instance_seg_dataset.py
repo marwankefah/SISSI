@@ -13,14 +13,15 @@ class chrisi_dataset(torch.utils.data.Dataset):
         # ensure that they are aligned
 
         all = os.listdir(os.path.join(root, split))
-        self.imgs = list(sorted([string for string in all if string.endswith(".jpg")]))
+        self.imgs = list(
+            sorted([string for string in all if string.endswith(".jpg")]))
 
     def __getitem__(self, idx):
         # load images and masks
         img_path = os.path.join(self.root, self.split, self.imgs[idx])
         img = Image.open(img_path).convert("RGB")
 
-        target=None
+        target = None
         if self.transforms is not None:
             img, target = self.transforms(img, target)
 
@@ -38,8 +39,10 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         # load all image files, sorting them to
         # ensure that they are aligned
         all = os.listdir(os.path.join(root, split))
-        self.imgs = list(sorted([string for string in all if string.endswith("img.png")]))
-        self.masks = list(sorted([string for string in all if string.endswith("masks.png")]))
+        self.imgs = list(
+            sorted([string for string in all if string.endswith("img.png")]))
+        self.masks = list(
+            sorted([string for string in all if string.endswith("masks.png")]))
 
     def __getitem__(self, idx):
         # load images and masks
@@ -74,7 +77,7 @@ class cell_pose_dataset(torch.utils.data.Dataset):
             xmax = np.max(pos[1])
             ymin = np.min(pos[0])
             ymax = np.max(pos[0])
-            #checking degenerated boxes or ugly boxes
+            # checking degenerated boxes or ugly boxes
             if xmin < xmax and ymin < ymax:
                 boxes.append([xmin, ymin, xmax, ymax])
 
@@ -89,16 +92,18 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         # suppose all instances are not crowd
         iscrowd = torch.zeros((num_objs,), dtype=torch.int64)
 
-        target = {}
-        target["boxes"] = boxes
+        if self.transforms is not None:
+            img, target = self.transforms(
+                image=np.array(img), mask=masks, bboxes=boxes)
+
+        else:
+            target = {}
+        # target["boxes"] = boxes
         target["labels"] = labels
-        target["masks"] = masks
+        # target["masks"] = masks
         target["image_id"] = image_id
         target["area"] = area
         target["iscrowd"] = iscrowd
-
-        if self.transforms is not None:
-            img, target = self.transforms(img, target)
 
         return img, target
 
