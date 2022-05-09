@@ -82,26 +82,32 @@ class cell_pose_dataset(torch.utils.data.Dataset):
                 boxes.append([xmin, ymin, xmax, ymax])
 
         labels = torch.ones((num_objs,), dtype=torch.int64)
-
+        mask_channel_last = masks
+        # change channels last to channels first format
+        mask_channel_last = np.moveaxis(mask_channel_last, 0, 2)
+        target = {}
         if self.transforms is not None:
-            img, target = self.transforms(
-                image=np.array(img), mask=np.array(masks), bboxes=boxes,class_labels=np.array(labels))
-        else:
-            target = {}
+            result = self.transforms(
+                image=np.array(img), mask=np.array(mask_channel_last), bboxes=boxes, class_labels=np.array(labels))
+
+
+        img = result['image']
+        boxes = result['bboxes']
+        masks = result['mask']
+
         # convert everything into a torch.Tensor
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         # there is only one class
-        masks = torch.as_tensor(masks, dtype=torch.uint8)
+        # masks = torch.as_tensor(masks, dtype=torch.uint8)
 
         image_id = torch.tensor([idx])
         area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
         # suppose all instances are not crowd
         iscrowd = torch.zeros((num_objs,), dtype=torch.int64)
 
-
-        # target["boxes"] = boxes
+        target["boxes"] = boxes
         target["labels"] = labels
-        # target["masks"] = masks
+        target["masks"] = masks
         target["image_id"] = image_id
         target["area"] = area
         target["iscrowd"] = iscrowd
