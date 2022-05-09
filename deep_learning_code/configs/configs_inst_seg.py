@@ -322,16 +322,15 @@ class Configs:
         return model
 
     def get_transform(self, train):
-        #TODO 1 add pad if needed and decrease random crop params
         if train:
             transforms = A.Compose([
-                A.PadIfNeeded (min_height=450, min_width=450),
-                A.RandomCrop(width=450, height=450),
+                A.PadIfNeeded(min_width=200, min_height=200, border_mode=0, value=0, mask_value=0),
+                A.RandomCrop(width=200, height=200),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
-                A.ShiftScaleRotate( p=1,shift_limit=0.0625,scale_limit=0.1),
+                A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1),
                 ToTensorV2(),
-            ],bbox_params=A.BboxParams(format='pascal_voc',label_fields=["class_labels"]))
+            ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=["class_labels"]))
         else:
             transforms = A.Compose(
                 [A.Resize(self.patch_size[0], self.patch_size[1]),

@@ -87,9 +87,10 @@ class cell_pose_dataset(torch.utils.data.Dataset):
                 invalid_ids.append(i)
 
         labels = torch.ones((num_objs - len(invalid_ids),), dtype=torch.int64)
-        mask_channel_last = np.delete(masks, invalid_ids, axis=0)
+        mask_channel_first = np.delete(masks, invalid_ids, axis=0)
         # change channels last to channels first format
-        mask_channel_last = np.moveaxis(mask_channel_last, 0, 2)
+        mask_channel_first = [mask_channel_first[i].astype(np.float32) for i in range(len(mask_channel_first))]
+
         target = {}
         if self.transforms is not None:
             img_np = np.array(img)
@@ -98,24 +99,29 @@ class cell_pose_dataset(torch.utils.data.Dataset):
                 raise
             img_np = img_np.astype(np.float32) / 255
             result = self.transforms(
-                image=img_np, mask=np.array(mask_channel_last).astype(np.float32), bboxes=boxes,
+                image=img_np, masks=mask_channel_first, bboxes=boxes,
                 class_labels=np.array(labels))
 
         # check images/mask shapes before  masks [N, H, W], make mask channel first in tensor
         img = result['image']
         boxes = result['bboxes']
-        masks = torch.moveaxis(result['mask'], 2, 0)
+        masks = result['masks']
+
+        labels = torch.ones((len(boxes),), dtype=torch.int64)
 
         # convert everything into a torch.Tensor
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         # there is only one class
-        # masks = torch.as_tensor(masks, dtype=torch.uint8)
+        masks = torch.as_tensor(masks, dtype=torch.uint8)
 
         image_id = torch.tensor([idx])
-        area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
         # suppose all instances are not crowd
         iscrowd = torch.zeros((num_objs,), dtype=torch.int64)
 
+        if torch.numel(boxes) != 0:
+            area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
+        else:
+            area = boxes
         target["boxes"] = boxes
         target["labels"] = labels
         target["masks"] = masks
