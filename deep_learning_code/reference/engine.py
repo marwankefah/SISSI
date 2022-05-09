@@ -183,7 +183,7 @@ def evaluate(configs, epoch, data_loader, device, writer):
                                                         val_losses_reduced) + "\t".join(loss_str))
 
     torch.set_num_threads(n_threads)
-    return coco_evaluator.coco_eval['bbox'].stats[2]
+    return coco_evaluator.coco_eval['bbox'].stats[1]
 
 
 def test(configs, epoch, data_loader, device, writer):
