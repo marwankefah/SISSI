@@ -151,6 +151,9 @@ def evaluate(configs, epoch, data_loader, device, writer):
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
 
+        if not configs.train_mask:
+            loss_dict_reduced.pop('loss_mask')
+
         val_loss_dict = Counter(val_loss_dict) + Counter(loss_dict_reduced)
 
     # gather the stats from all processes
