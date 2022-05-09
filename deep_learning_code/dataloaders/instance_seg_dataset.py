@@ -3,6 +3,7 @@ import os
 import numpy as np
 import torch
 from PIL import Image
+import cv2
 
 
 class chrisi_dataset(torch.utils.data.Dataset):
@@ -49,16 +50,19 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         # load images and masks
         img_path = os.path.join(self.root, self.split, self.imgs[idx])
         mask_path = os.path.join(self.root, self.split, self.masks[idx])
-        img = Image.open(img_path).convert("RGB")
+
+        img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = np.stack((img,)*3, axis=-1)
 
         # note that we haven't converted the mask to RGB,
         # because each color corresponds to a different instance
         # with 0 being background
 
-        mask = Image.open(mask_path)
+        mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
         # convert the PIL Image into a numpy array
-
         mask = np.array(mask)
+
         # instances are encoded as different colors
         obj_ids = np.unique(mask)
         # first id is the background, so remove it
@@ -89,7 +93,8 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         labels = torch.ones((num_objs - len(invalid_ids),), dtype=torch.int64)
         mask_channel_first = np.delete(masks, invalid_ids, axis=0)
         # change channels last to channels first format
-        mask_channel_first = [mask_channel_first[i].astype(np.float32) for i in range(len(mask_channel_first))]
+        mask_channel_first = [mask_channel_first[i].astype(
+            np.float32) for i in range(len(mask_channel_first))]
 
         target = {}
         if self.transforms is not None:
