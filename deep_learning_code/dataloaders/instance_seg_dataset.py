@@ -1,3 +1,4 @@
+import logging
 import os
 import numpy as np
 import torch
@@ -49,6 +50,7 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         img_path = os.path.join(self.root, self.split, self.imgs[idx])
         mask_path = os.path.join(self.root, self.split, self.masks[idx])
         img = Image.open(img_path).convert("RGB")
+
         # note that we haven't converted the mask to RGB,
         # because each color corresponds to a different instance
         # with 0 being background
@@ -71,6 +73,7 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         # get bounding box coordinates for each mask
         num_objs = len(obj_ids)
         boxes = []
+        invalid_ids = []
         for i in range(num_objs):
             pos = np.where(masks[i])
             xmin = np.min(pos[1])
@@ -80,17 +83,25 @@ class cell_pose_dataset(torch.utils.data.Dataset):
             # checking degenerated boxes or ugly boxes
             if xmin < xmax and ymin < ymax:
                 boxes.append([xmin, ymin, xmax, ymax])
+            else:
+                invalid_ids.append(i)
 
-        labels = torch.ones((num_objs,), dtype=torch.int64)
-        mask_channel_last = masks
+        labels = torch.ones((num_objs-len(invalid_ids),), dtype=torch.int64)
+        mask_channel_last = np.delete(masks, invalid_ids, axis=0)
         # change channels last to channels first format
         mask_channel_last = np.moveaxis(mask_channel_last, 0, 2)
         target = {}
         if self.transforms is not None:
+            img_np = np.array(img)
+            if not img_np.dtype == np.uint8:
+                logging.info("Error: Image is not of type np.uint8?")
+                raise
+            img_np = img_np.astype(np.float32) / 255
             result = self.transforms(
-                image=np.array(img), mask=np.array(mask_channel_last), bboxes=boxes, class_labels=np.array(labels))
+                image=img_np, mask=np.array(mask_channel_last).astype(np.float32), bboxes=boxes,
+                class_labels=np.array(labels))
 
-
+        # check images/mask shapes before  masks [N, H, W], make mask channel first in tensor
         img = result['image']
         boxes = result['bboxes']
         masks = result['mask']

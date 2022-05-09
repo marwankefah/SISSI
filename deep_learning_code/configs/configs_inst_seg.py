@@ -322,16 +322,15 @@ class Configs:
         return model
 
     def get_transform(self, train):
-        #TODO 1 fix shiftscale rotate, read with cv2 instead?
-        # TODO 2 image is not normalized between 0,1 we need that also to work
-        #TODO 3 add pad if needed and decrease random crop params
+        #TODO 1 add pad if needed and decrease random crop params
         if train:
             transforms = A.Compose([
+                A.PadIfNeeded (min_height=450, min_width=450),
                 A.RandomCrop(width=450, height=450),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
-                # A.ShiftScaleRotate(),
-                ToTensorV2(),
+                A.ShiftScaleRotate( p=1,shift_limit=0.0625,scale_limit=0.1),
+                ToTensorV2(transpose_mask=True),
             ],bbox_params=A.BboxParams(format='pascal_voc',label_fields=["class_labels"]))
         else:
             transforms = A.Compose(
