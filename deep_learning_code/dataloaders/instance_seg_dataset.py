@@ -86,7 +86,7 @@ class cell_pose_dataset(torch.utils.data.Dataset):
             else:
                 invalid_ids.append(i)
 
-        labels = torch.ones((num_objs-len(invalid_ids),), dtype=torch.int64)
+        labels = torch.ones((num_objs - len(invalid_ids),), dtype=torch.int64)
         mask_channel_last = np.delete(masks, invalid_ids, axis=0)
         # change channels last to channels first format
         mask_channel_last = np.moveaxis(mask_channel_last, 0, 2)
@@ -104,7 +104,7 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         # check images/mask shapes before  masks [N, H, W], make mask channel first in tensor
         img = result['image']
         boxes = result['bboxes']
-        masks = result['mask']
+        masks = torch.moveaxis(result['mask'], 2, 0)
 
         # convert everything into a torch.Tensor
         boxes = torch.as_tensor(boxes, dtype=torch.float32)

@@ -330,7 +330,7 @@ class Configs:
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 A.ShiftScaleRotate( p=1,shift_limit=0.0625,scale_limit=0.1),
-                ToTensorV2(transpose_mask=True),
+                ToTensorV2(),
             ],bbox_params=A.BboxParams(format='pascal_voc',label_fields=["class_labels"]))
         else:
             transforms = A.Compose(
