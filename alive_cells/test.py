@@ -1,8 +1,9 @@
-
 import numpy as np
 from PIL import Image
 import os
-def save_mask_png(labels,cell_name,output_path):
+
+
+def save_mask_png(labels, cell_name, output_path):
     mask = np.asarray(labels)
     obj_ids = np.unique(mask)
     # first id is the background, so remove it
@@ -18,7 +19,8 @@ def save_mask_png(labels,cell_name,output_path):
         ymin = np.min(pos[0])
         ymax = np.max(pos[0])
         # checking degenerated boxes or ugly boxes
-        if xmin < xmax and ymin < ymax:
+        if xmin < xmax and ymin < ymax and xmin >= 0 and ymin >= 0 and xmax <= mask[i].shape[1] and ymax <= \
+                mask[i].shape[0]:
             boxes.append([xmin, ymin, xmax, ymax])
         else:
             invalid_ids.append(i)
@@ -29,8 +31,8 @@ def save_mask_png(labels,cell_name,output_path):
     for idx, mask in enumerate(masks):
         maski[mask == 1] = idx + 1
 
-    Image.fromarray(maski).save(os.path.join(output_path,cell_name.split('.')[0]+'_mask.png'
-                                                                                 ''))
+    Image.fromarray(maski).save(os.path.join(output_path, cell_name.split('.')[0] + '_mask.png'
+                                                                                    ''))
 
 # from scipy.signal.signaltools import convolve2d
 #

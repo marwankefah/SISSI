@@ -21,7 +21,7 @@ from utils.seed_detection import seed_detection
 from PIL import Image
 from test import save_mask_png
 
-cell_type = 'alive'
+cell_type = 'test'
 data_dir = Path(
     "../data/chrisi/" + cell_type + "/"
 )
@@ -187,9 +187,6 @@ for image, cell_name in dead_images_raw:
 
     axes[1].imshow(overlay)
     axes[1].set_title('Separated objects')
-
-
-
 
     fig.tight_layout()
     # plt.savefig(os.path.join(output_path,cell_name))
