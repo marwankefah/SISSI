@@ -18,6 +18,8 @@ from skimage.segmentation import watershed
 from skimage.feature import peak_local_max
 from utils.preprocess import illumination_correction, EGT_Segmentation, mask_overlay
 from utils.seed_detection import seed_detection
+from PIL import Image
+from test import save_mask_png
 
 cell_type = 'alive'
 data_dir = Path(
@@ -168,7 +170,9 @@ for image, cell_name in dead_images_raw:
     axes[1, 1].imshow(imgout)
     axes[1, 1].set_title('outlines of objects')
 
+
     overlay = mask_overlay(image, labels)
+
     axes[1, 2].imshow(overlay)
     axes[1, 2].set_title('Separated objects')
 
@@ -176,5 +180,25 @@ for image, cell_name in dead_images_raw:
 
     # plt.savefig(os.path.join(output_path, cell_name))
     plt.show()
+
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(20, 20))
+    axes[0].imshow(imgout)
+    axes[0].set_title('outlines of objects')
+
+    axes[1].imshow(overlay)
+    axes[1].set_title('Separated objects')
+
+
+
+
+    fig.tight_layout()
+    # plt.savefig(os.path.join(output_path,cell_name))
+    plt.show()
+
+    output_path = '../data/weak_labels/' + cell_type
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    save_mask_png(labels,cell_name,output_path)
 
 cv2.destroyAllWindows()
