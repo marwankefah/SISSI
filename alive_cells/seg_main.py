@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import ndimage as ndi
 from sklearn.cluster._mean_shift import estimate_bandwidth, MeanShift
+from findmaxima2d import find_maxima, find_local_maxima  # Version that has been installed into python site-packages.
 
 from utils.preprocess import fill_holes, imreconstruct, imposemin
 import utils.cellpose_utils as cellpose_utils
@@ -17,6 +18,8 @@ from skimage.segmentation import watershed
 from skimage.feature import peak_local_max
 from utils.preprocess import illumination_correction, EGT_Segmentation, mask_overlay
 from utils.seed_detection import seed_detection
+from PIL import Image
+from test import save_mask_png
 
 cell_type = 'alive'
 data_dir = Path(
@@ -101,7 +104,7 @@ for image, cell_name in dead_images_raw:
 
     ret2, th2 = cv2.threshold(eroded_foreground, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    watershedInput = imposemin(magnitude / 255, cv2.bitwise_or(img5 // 255, th2//255))
+    watershedInput = imposemin(magnitude / 255, cv2.bitwise_or(img5 // 255, th2 // 255))
 
     # TODO implement seed instead to get coords(markers)
     try:
@@ -109,10 +112,37 @@ for image, cell_name in dead_images_raw:
     except:
         raise NameError(f"Error for {cell_name} ")
 
-    markers, _ = ndi.label(mask)
-    overlay = mask_overlay(opened_closed_br_image, markers)
+    ntol = 50  # Noise Tolerance.
+    img_data = np.array(image).astype(np.float64)
+    img_data = rgb
+    # Should your image be an RGB image.
+    if img_data.shape.__len__() > 2:
+        img_data = (np.sum(img_data, 2) / 3.0)
 
-    labels = watershed(watershedInput, markers, mask=th2)
+    # Finds the local maxima using mximum filter.
+    local_max = find_local_maxima(img_data)
+
+    y, x, regs = find_maxima(img_data, local_max, ntol)
+    plt.figure(figsize=(16, 16))
+    plt.imshow(image)
+    plt.plot(x, y, 'r+')
+
+    image_m = image.copy()
+    markers_imagej = np.zeros_like(cell_gray)
+    markers_imagej[y, x] = 255
+
+    markers_imagej, _ = ndi.label(markers_imagej)
+
+    # watershed_cv2 = cv2.watershed(image.astype(np.uint8), markers_imagej)
+
+    # image_m[watershed_cv2 == -1] = [255, 0, 0]
+
+    # plt.imshow(image_m)
+    # plt.show()
+    markers, _ = ndi.label(mask)
+    overlay = mask_overlay(cell_clahe, markers)
+
+    labels = watershed(watershedInput, markers_imagej, mask=th2)
 
     # outlines for plotting from cellpose
     outlines = cellpose_utils.masks_to_outlines(labels)
@@ -140,7 +170,9 @@ for image, cell_name in dead_images_raw:
     axes[1, 1].imshow(imgout)
     axes[1, 1].set_title('outlines of objects')
 
+
     overlay = mask_overlay(image, labels)
+
     axes[1, 2].imshow(overlay)
     axes[1, 2].set_title('Separated objects')
 
@@ -148,5 +180,25 @@ for image, cell_name in dead_images_raw:
 
     # plt.savefig(os.path.join(output_path, cell_name))
     plt.show()
+
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(20, 20))
+    axes[0].imshow(imgout)
+    axes[0].set_title('outlines of objects')
+
+    axes[1].imshow(overlay)
+    axes[1].set_title('Separated objects')
+
+
+
+
+    fig.tight_layout()
+    # plt.savefig(os.path.join(output_path,cell_name))
+    plt.show()
+
+    output_path = '../data/weak_labels/' + cell_type
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    save_mask_png(labels,cell_name,output_path)
 
 cv2.destroyAllWindows()

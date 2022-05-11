@@ -27,11 +27,10 @@ from PIL import ImageFile
 
 from configs.configs_inst_seg import Configs
 
-from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset,chrisi_dataset
+from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset, chrisi_dataset
 
 import reference.utils as utils
-from reference.engine import train_one_epoch, evaluate,test
-
+from reference.engine import train_one_epoch, evaluate, test
 
 
 def train(configs, snapshot_path):
@@ -55,6 +54,10 @@ def train(configs, snapshot_path):
     trainloader = torch.utils.data.DataLoader(
         db_train, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
+    # for iter_epoch, (images, targets) in enumerate(trainloader):
+    #     if iter_epoch == 38:
+    #         print(1)
+    #     print(iter_epoch)
 
     valloader = torch.utils.data.DataLoader(
         db_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
@@ -71,28 +74,28 @@ def train(configs, snapshot_path):
 
     max_epoch = configs.max_iterations // len(trainloader) + 1
     iterator = tqdm(range(configs.start_epoch, max_epoch), ncols=70)
-    best_AP_75_all = configs.best_performance
+    best_AP_50_all = configs.best_performance
 
     for epoch_num in iterator:
 
         train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
         configs.lr_scheduler.step()
-        AP_75_all = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
+        AP_50_all = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
-        test(configs, epoch_num, alive_data_loader, configs.device, configs.alive_writer )        # AP iou 0.75--all bbox
+        test(configs, epoch_num, alive_data_loader, configs.device, configs.alive_writer)  # AP iou 0.75--all bbox
 
-        if AP_75_all > best_AP_75_all:
-            best_AP_75_all = AP_75_all
+        if AP_50_all > best_AP_50_all:
+            best_AP_50_all = AP_50_all
             save_mode_path = os.path.join(snapshot_path,
                                           'epoch_{}_val_AP_75_all_{}.pth'.format(
-                                              epoch_num, round(best_AP_75_all, 4)))
-            logging.info('saving model with best performance {}'.format(best_AP_75_all))
+                                              epoch_num, round(best_AP_50_all, 4)))
+            logging.info('saving model with best performance {}'.format(best_AP_50_all))
             utils.save_on_master({
                 'model': configs.model.state_dict(),
                 'optimizer': configs.optimizer.state_dict(),
                 'lr_scheduler': configs.lr_scheduler.state_dict(),
                 'epoch': epoch_num,
-                'best_performance': best_AP_75_all}, save_mode_path)
+                'best_performance': best_AP_50_all}, save_mode_path)
 
         if iter_num >= configs.max_iterations:
             break
