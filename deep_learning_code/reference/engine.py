@@ -86,7 +86,6 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
         logging.info('{} [{}/{}] loss:{} '.format(header, iter_epoch, total_iter_per_epoch,
                                                   round(loss_value, 4)) + "\t".join(loss_str))
 
-        # TODO add images and predictions and masks to tensorboard
     train_losses_reduced = sum(loss for loss in train_loss_dict.values()) / total_iter_per_epoch
     loss_str = []
     for name, meter in train_loss_dict.items():
@@ -150,9 +149,6 @@ def evaluate(configs, epoch, data_loader, device, writer):
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
-        if not configs.train_mask:
-            loss_dict_reduced.pop('loss_mask')
-
         if not configs.train_mask:
             loss_dict_reduced.pop('loss_mask')
 
