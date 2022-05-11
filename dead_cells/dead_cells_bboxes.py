@@ -53,7 +53,7 @@ for img, img_name in dead_images_raw:
         bboxes = pd.DataFrame(bbox)
         filename = img_name.split(".")[0]
         bboxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
-            str(bbox_output_path/Path(f"{filename}.txt")), header=None, index=None)
+            str(bbox_output_path/Path(f"{filename}.txt")), sep=' ', header=None, index=None)
 
         # cv2.imshow("output", np.hstack([img, output]))
         cv2.imwrite(str(output_path / img_name), np.hstack([img, output]))
