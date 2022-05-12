@@ -50,6 +50,8 @@ class chrisi_dataset(torch.utils.data.Dataset):
 
         boxes = result['bboxes']
         num_objs = len(boxes)
+
+
         img = result['image']
 
         # there is only one class
