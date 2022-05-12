@@ -32,32 +32,35 @@ for img, img_name in dead_images_raw:
 
     output = img.copy()
     mask = np.zeros_like(img)
+
     if circles is not None:
         bbox = {"cell_name": [], "x_min": [],
                 "y_min": [], "x_max": [], "y_max": []}
 
         circles = np.round(circles[0, :]).astype("int")
+        i = 1
+
         for (x, y, r) in circles:
-            print((x, y, r))
             cv2.circle(output, (x, y), r+2, (0, 255, 0), 1)
-            cv2.circle(mask, (x, y), r+2, (255, 255, 255), -1)
+            cv2.circle(mask, (x, y), r+2, (i, i, i), -1)
 
             cv2.rectangle(output, (x - r - 5, y - r - 5),
                           (x + r + 5, y + r + 5), (255, 0, 0), 2)
             bbox["cell_name"].append("dead")
+            bbox["x_min"].append(max(x - r - 5, 0))
+            bbox["y_min"].append(max(y - r - 5, 0))
+            bbox["x_max"].append(min(x + r + 5, img.shape[0]))
+            bbox["y_max"].append(min(y + r + 5, img.shape[1]))
+            i += 1
 
-            bbox["x_min"].append(x - r - 5)
-            bbox["y_min"].append(y - r - 5)
-            bbox["x_max"].append(x + r + 5)
-            bbox["y_max"].append(y + r + 5)
         bboxes = pd.DataFrame(bbox)
         filename = img_name.split(".")[0]
         bboxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
             str(bbox_output_path/Path(f"{filename}.txt")), sep=' ', header=None, index=None)
 
         # cv2.imshow("output", np.hstack([img, output]))
-        cv2.imwrite(str(output_path / img_name), np.hstack([img, output]))
-        print(output_path / Path("mask") / img_name)
+        cv2.imwrite(str(output_path / img_name), np.hstack([img, mask]))
+        # print(output_path / Path("mask") / img_name)
         cv2.imwrite(str(mask_output_path /
                     Path(f"{filename}.png")), mask)
 
