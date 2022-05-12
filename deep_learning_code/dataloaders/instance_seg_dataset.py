@@ -14,23 +14,63 @@ class chrisi_dataset(torch.utils.data.Dataset):
         # load all image files, sorting them to
         # ensure that they are aligned
 
-        all = os.listdir(os.path.join(root, split))
+        images_dir = os.listdir(os.path.join(root, split))
+        # TODO to be abstracted
+        self.bboxes_dir_path = os.path.join(self.root, 'weak_labels', self.split)
+
         self.imgs = list(
-            sorted([string for string in all if string.endswith(".jpg")]))
+            sorted([string for string in images_dir if string.endswith(".jpg")]))
+        # self.bboxes = list(
+        #     sorted([string for string in self.bboxes_dir_path if string.endswith(".txt")]))
+        #
 
     def __getitem__(self, idx):
         # load images and masks
         img_path = os.path.join(self.root, self.split, self.imgs[idx])
-        img = cv2.imread(img_path, cv2.IMREAD_COLOR)
 
-        target = None
+        bboxes_path = os.path.join(self.bboxes_dir_path, self.imgs[idx].split('.')[0] + '.txt')
+
+        img = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        annotations = np.loadtxt(bboxes_path,
+                                 dtype={'names': ('cell_name', 'x_min', 'y_min', 'x_max', 'y_max'),
+                                        'formats': ('U25', 'i4', 'i4', 'i4', 'i4')}, delimiter=' ')
+
+        boxes = np.dstack((annotations['x_min'], annotations['y_min'], annotations['x_max'], annotations['y_max']))
+        boxes = boxes[0].tolist()
+        labels = [1] * len(boxes)
+        target = {}
         if self.transforms is not None:
-          img_np = np.array(img)
-          if not img_np.dtype == np.uint8:
-            logging.info("Error: Image is not of type np.uint8?")
-            raise
-          img_np = img_np.astype(np.float32) / 255
-          img = self.transforms(image=img_np)['image']
+            img_np = np.array(img)
+            if not img_np.dtype == np.uint8:
+                logging.info("Error: Image is not of type np.uint8?")
+                raise
+            img_np = img_np.astype(np.float32) / 255
+            result = self.transforms(
+                image=img_np, bboxes=boxes, category_id=labels)
+
+        boxes = result['bboxes']
+        num_objs = len(boxes)
+        img = result['image']
+
+        # there is only one class
+        labels = torch.as_tensor(result['category_id'], dtype=torch.int64)
+
+        # convert everything into a torch.Tensor
+        boxes = torch.as_tensor(boxes, dtype=torch.float32)
+        area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
+
+        masks = torch.empty((0,),dtype=torch.uint8)
+
+        image_id = torch.tensor([idx])
+        # suppose all instances are not crowd
+        iscrowd = torch.zeros((num_objs,), dtype=torch.int64)
+
+        target["boxes"] = boxes
+        target["labels"] = labels
+        # target["masks"] = masks
+        target["image_id"] = image_id
+        target["area"] = area
+        target["iscrowd"] = iscrowd
 
         return img, target
 

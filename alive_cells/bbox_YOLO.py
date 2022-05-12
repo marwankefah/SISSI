@@ -6,7 +6,8 @@ import cv2
 from pathlib import Path
 from PIL import Image
 
-cell_type = 'test'
+
+cell_type = 'alive'
 data_dir = Path(
     "../data/chrisi/" + cell_type + "/"
 )
@@ -17,7 +18,7 @@ dead_images_raw.remove([None, '.gitignore'])
 
 
 output_path = Path(
-    "../data/weak_labels/alive/")
+    "../data/chrisi/weak_labels/alive/")
 
 # output_path = Path(
 #     "../data/test_labels/")
@@ -68,7 +69,7 @@ for img, img_name in dead_images_raw:
     bboxes = pd.DataFrame(bbox)
     filename = img_name.split(".")[0]
     bboxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
-        str(output_path/Path(f"{filename}.txt")), header=None, index=None)
+        str(output_path/Path(f"{filename}.txt")),sep=' ',header=None, index=None)
 
     # plt.imshow(img)
     # plt.show()

@@ -142,15 +142,6 @@ class Configs:
         self.in_channels = config_file.getint(
             'network', 'in_channels', fallback=1)
 
-        # Model
-
-        aux_params = dict(
-            pooling='avg',  # one of 'avg', 'max'
-            # dropout=0.5,  # dropout ratio, default is None
-            # activation='sigmoid',  # activation function, default is None
-            classes=self.num_classes,  # define number of output labels
-        )
-
         self.model = self.create_mask_rcnn(self.num_classes)
         use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if use_cuda else "cpu")
@@ -176,114 +167,11 @@ class Configs:
         self.train_writer = None
         self.val_writer = None
 
-        image_loader = None
-        channel_transform = None
-        lambda_transform_channel = None
-
-        if self.in_channels == 1:
-            print("Not implemented", self.in_channels)
-            # TODO force the image to have one dim
-            # image_loader = PILReader(converter=lambda image: image)
-            # TODO instead of dividing by 255 to make the label mask between 0 and 1 ,make it more generic
-            # TODO Scale intensity?
-            # lambda_transform_channel = Lambdad(
-            #     keys=["label"], func=[lambda x: x / 255])
-
-            # image_loader= NibabelReader()
-            # lambda_transform_channel= Lambdad(keys=["image","label"],func=[lambda x: x[:,:,0],lambda x: x[:,:,0]])
-
-            # channel_transform = AddChanneld(keys=["image", "label"])
-        elif self.in_channels == 3:
-            print("Not implemented", self.in_channels)
-            # TODO force the image to have 3 dim
-            # image_loader = PILReader(converter=lambda image: image)
-            # lambda_transform_channel = Lambdad(keys=["label"], func=[lambda x:x[:,:,0]])
-            # TODO instead of dividing by 255 to make the label mask between 0 and 1 ,make it more generic
-            # TODO Scale intensity?
-            # lambda_transform_channel = Lambdad(
-            #     keys=["label"], func=[lambda x: x[:, :, 0] / 255])
-
-            # image_loader= NibabelReader()
-            # lambda_transform_channel= Lambdad(keys=["label"],func=[lambda x: x,lambda x: x[:,:,0]])
-            # channel_transform = AsChannelFirstd(keys=["image", "label"])
-        else:
-            raise Exception("input channel is not supported")
-
-        # deform = Rand2DElasticd(
-        #     keys=["image", "label"],
-        #     prob=0.5,
-        #     spacing=(7, 7),
-        #     magnitude_range=(1, 2),
-        #     rotate_range=(np.pi / 6,),
-        #     scale_range=(0.2, 0.2),
-        #     translate_range=(20, 20),
-        #     padding_mode="zeros",
-        #     # device=self.device,
-        # )
-
-        # affine = RandAffined(
-        #     keys=["image", "label"],
-        #     prob=0.5,
-        #     rotate_range=(np.pi / 6),
-        #     scale_range=(0.2, 0.2),
-        #     translate_range=(20, 20),
-        #     padding_mode="zeros",
-        #     # device=self.device
-        # )
-
-        # self.train_transform = Compose(
-        #     [
-        #         LoadImaged(keys=["image", "label"], reader=image_loader),
-        #         lambda_transform_channel,
-        #         channel_transform,
-        #
-        #         LabelToMaskd(keys=["label"], select_labels=[1]),
-        #
-        #         ScaleIntensityd(keys=["image", "label"]),
-        #
-        #         Resized(keys=["image", "label"], spatial_size=(self.patch_size[0], self.patch_size[1])),
-        #         RandRotated(keys=["image", "label"], range_x=(-np.pi / 6, np.pi / 6), prob=0.5, keep_size=True),
-        #
-        #         RandFlipd(keys=["image", "label"], spatial_axis=0, prob=0.5),
-        #         RandFlipd(keys=["image", "label"], spatial_axis=1, prob=0.5),
-        #
-        #         RandZoomd(keys=["image", "label"], min_zoom=0.9, max_zoom=1.1, prob=0.5),
-        #
-        #         RandGaussianSmoothd(keys=["image"], prob=0.1, sigma_x=(0.25, 1.5), sigma_y=(0.25, 1.5)),
-        #         RandGaussianNoised(keys=["image"], mean=0, std=0.1, prob=0.5),
-        #
-        #         OneOf(transforms=[affine, deform], weights=[0.8, 0.2]),
-        #         # NormalizeIntensity(subtrahend=None, divisor=None, channel_wise=False),
-        #
-        #         EnsureTyped(keys=["image", "label"], ),
-        #     ]
-        # )
-
-        # self.val_transform = Compose(
-        #     [
-        #         LoadImaged(keys=["image", "label"], reader=image_loader),
-        #         lambda_transform_channel,
-        #         channel_transform,
-        #
-        #         LabelToMaskd(keys=["label"], select_labels=[1]),
-        #
-        #         ScaleIntensityd(keys=["image", "label"]),
-        #
-        #         # NormalizeIntensity(subtrahend=None, divisor=None, channel_wise=False),
-        #
-        #         Resized(keys=["image", "label"], spatial_size=(self.patch_size[0], self.patch_size[1])),
-        #         EnsureTyped(keys=["image", "label"])
-        #     ])
-
         self.train_transform = self.get_transform(True)
         self.val_transform = self.get_transform(False)
+        self.train_detections_transforms=self.get_transform_detection(True)
+        self.val_detections_transforms=self.get_transform_detection(False)
 
-        # self.y_pred_trans = Compose(
-        #     [EnsureType(), Activations(softmax=True), AsDiscrete(argmax=True, to_onehot=self.num_classes)])
-
-        # self.y_trans = AsDiscrete(threshold=0.1, to_onehot=self.num_classes)
-
-        # self.dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
         self.best_performance = 0
         self.start_epoch = 0
         if self.load_model:
@@ -295,6 +183,10 @@ class Configs:
             self.start_epoch = checkpoint['epoch'] + 1
             self.best_performance = checkpoint['best_performance']
 
+
+        if not self.train_mask:
+            self.model.roi_heads.mask_predictor= None
+
     def update_lr(self, iter_num):
         if self.optim.lower() == 'sgd':
             lr_ = self.base_lr * (1.0 - iter_num / self.max_iterations) ** 0.9
@@ -303,7 +195,7 @@ class Configs:
 
     def create_mask_rcnn(self, num_classes):
 
-        model = maskrcnn_resnet50_fpn(pretrained_backbone=True,min_size=400 ,max_size=800,box_detections_per_img=250)
+        model = maskrcnn_resnet50_fpn(pretrained_backbone=True, min_size=400, max_size=800, box_detections_per_img=250)
 
         # get number of input features for the classifier
         in_features = model.roi_heads.box_predictor.cls_score.in_features
@@ -330,13 +222,34 @@ class Configs:
                 A.Blur(),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
-                A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1,border_mode=0, value=0, mask_value=0),
+                A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1, border_mode=0, value=0, mask_value=0),
                 ToTensorV2(),
             ])
-              #  ,bbox_params={'format':'pascal_voc', 'min_area': 0, 'min_visibility': 0, 'label_fields': ['category_id']} )
+            #  ,bbox_params={'format':'pascal_voc', 'min_area': 0, 'min_visibility': 0, 'label_fields': ['category_id']} )
         else:
             transforms = A.Compose(
                 [A.Resize(self.patch_size[0], self.patch_size[1]),
                  ToTensorV2(),
                  ])
+        return transforms
+
+    def get_transform_detection(self, train):
+        if train:
+            transforms = A.Compose([
+                A.Resize(self.patch_size[0], self.patch_size[1]),
+                A.ChannelShuffle(),
+                A.Blur(),
+                A.HorizontalFlip(p=0.5),
+                A.VerticalFlip(p=0.5),
+                A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1, border_mode=0, value=0, mask_value=0),
+                ToTensorV2(),
+            ]
+               , bbox_params={'format': 'pascal_voc', 'min_area': 0, 'min_visibility': 0,
+                               'label_fields': ['category_id']})
+        else:
+            transforms = A.Compose(
+                [A.Resize(self.patch_size[0], self.patch_size[1]),
+                 ToTensorV2(),
+                 ], bbox_params={'format': 'pascal_voc', 'min_area': 0, 'min_visibility': 0,
+                                 'label_fields': ['category_id']})
         return transforms

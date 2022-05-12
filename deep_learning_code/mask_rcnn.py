@@ -37,27 +37,41 @@ def train(configs, snapshot_path):
     configs.train_writer = SummaryWriter(snapshot_path + '/log')
     configs.val_writer = SummaryWriter(snapshot_path + '/log_val')
     configs.alive_writer = SummaryWriter(snapshot_path + '/log_alive')
+    configs.chrisi_test_writer = SummaryWriter(snapshot_path + '/log_chrisi_test')
 
     configs.model.to(configs.device)
 
-    # db_train = PennFudanDataset('../data/PennFudanPed', configs.train_transform)
-    # db_test = PennFudanDataset('../data/PennFudanPed', configs.val_transform)
-
     db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
-    db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, 'alive', configs.val_transform)
+    db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, 'alive', configs.val_detections_transforms)
+    db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, 'test_labelled', configs.val_detections_transforms)
+
+    chrisi_test_data_loader = torch.utils.data.DataLoader(
+        db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
+        collate_fn=utils.collate_fn)
 
     alive_data_loader = torch.utils.data.DataLoader(
         db_chrisi_alive, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
+    # score_thresh
+    # nms_thresh
+    # detections_per_img
+    # past_score_thresh = configs.model.roi_heads.score_thresh
+    # past_detections_per_img = configs.model.roi_heads.detections_per_img
+    # past_nms_thresh = configs.model.roi_heads.nms_thresh
+
+    # configs.model.roi_heads.score_thresh = 0.2
+    # configs.model.roi_heads.detections_per_img = 200
+    # configs.model.roi_heads.nms_thresh = 0.7
+
+    # configs.model.roi_heads.score_thresh = past_score_thresh
+    # configs.model.roi_heads.detections_per_img = past_detections_per_img
+    # configs.model.roi_heads.nms_thresh = past_nms_thresh
+
     trainloader = torch.utils.data.DataLoader(
         db_train, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
-    # for iter_epoch, (images, targets) in enumerate(trainloader):
-    #     if iter_epoch == 38:
-    #         print(1)
-    #     print(iter_epoch)
 
     valloader = torch.utils.data.DataLoader(
         db_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
@@ -82,8 +96,12 @@ def train(configs, snapshot_path):
         configs.lr_scheduler.step()
         AP_50_all = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
-        test(configs, epoch_num, alive_data_loader, configs.device, configs.alive_writer)  # AP iou 0.75--all bbox
+        #evaluate chrisi testset
+        evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
+                 vis_every_iter=1)  # AP iou 0.75--all bbox
 
+        # test(configs, epoch_num, alive_data_loader, configs.device, configs.alive_writer)  # AP iou 0.75--all bbox
+        #TODO save each epoch?
         if AP_50_all > best_AP_50_all:
             best_AP_50_all = AP_50_all
             save_mode_path = os.path.join(snapshot_path,
