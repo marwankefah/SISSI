@@ -1,6 +1,8 @@
 import os
 
 from torch.backends import cudnn
+from torch.utils.data.dataset import ConcatDataset
+
 import utils
 import torch
 import argparse
@@ -41,22 +43,30 @@ def train(configs, snapshot_path):
 
     configs.model.to(configs.device)
 
-    db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
-    db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
-    db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, 'alive', configs.val_detections_transforms)
+    # db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
+    # db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
+
+    db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, 'alive', configs.train_detections_transforms)
+    db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, 'dead', configs.train_detections_transforms)
+    # db_chrisi_inhib = chrisi_dataset(configs.chrisi_cells_root_path, 'inhib', configs.train_detections_transforms)
+
     db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, 'test_labelled', configs.val_detections_transforms)
+
+    weak_label_chrisi_dataset = ConcatDataset(
+        [db_chrisi_alive, db_chrisi_dead])
+
+    weak_label_chrisi_dataloader = torch.utils.data.DataLoader(
+        weak_label_chrisi_dataset, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
+        collate_fn=utils.collate_fn)
 
     chrisi_test_data_loader = torch.utils.data.DataLoader(
         db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
-    alive_data_loader = torch.utils.data.DataLoader(
-        db_chrisi_alive, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
-        collate_fn=utils.collate_fn)
-
     # score_thresh
     # nms_thresh
     # detections_per_img
+
     # past_score_thresh = configs.model.roi_heads.score_thresh
     # past_detections_per_img = configs.model.roi_heads.detections_per_img
     # past_nms_thresh = configs.model.roi_heads.nms_thresh
@@ -72,51 +82,52 @@ def train(configs, snapshot_path):
     # configs.model.roi_heads.detections_per_img = past_detections_per_img
     # configs.model.roi_heads.nms_thresh = past_nms_thresh
 
-    trainloader = torch.utils.data.DataLoader(
-        db_train, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
-        collate_fn=utils.collate_fn)
 
-    valloader = torch.utils.data.DataLoader(
-        db_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
-        collate_fn=utils.collate_fn)
 
     configs.model.train()
 
     writer = configs.train_writer
     writer_val = configs.val_writer
 
-    logging.info("{} iterations per epoch".format(len(trainloader)))
+    logging.info("{} iterations per epoch".format(len(weak_label_chrisi_dataloader)))
 
     iter_num = 0
 
-    max_epoch = configs.max_iterations // len(trainloader) + 1
+    max_epoch = configs.max_iterations // len(weak_label_chrisi_dataloader) + 1
     iterator = tqdm(range(configs.start_epoch, max_epoch), ncols=70)
     best_AP_50_all = configs.best_performance
 
     for epoch_num in iterator:
 
-        train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
+        #TODO return iou values in training
+        train_one_epoch(configs, weak_label_chrisi_dataloader, epoch_num, print_freq=10, writer=writer)
         configs.lr_scheduler.step()
-        AP_50_all = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
-        #evaluate chrisi testset
-        evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
-                 vis_every_iter=1)  # AP iou 0.75--all bbox
+        #TODO checkif it needs label correction
+
+
+
+        #TODO label correction saving to a folder with epoch_num
+
+
+        #TODO dataset_resetting labels and updating train_loader
+
+        # evaluate chrisi testset
+        AP_50_all = evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
+                             vis_every_iter=1)
 
         # test(configs, epoch_num, alive_data_loader, configs.device, configs.alive_writer)  # AP iou 0.75--all bbox
-        #TODO save each epoch?
-        if AP_50_all > best_AP_50_all:
-            best_AP_50_all = AP_50_all
-            save_mode_path = os.path.join(snapshot_path,
-                                          'epoch_{}_val_AP_50_all_{}.pth'.format(
-                                              epoch_num, round(best_AP_50_all, 4)))
-            logging.info('saving model with best performance {}'.format(best_AP_50_all))
-            utils.save_on_master({
-                'model': configs.model.state_dict(),
-                'optimizer': configs.optimizer.state_dict(),
-                'lr_scheduler': configs.lr_scheduler.state_dict(),
-                'epoch': epoch_num,
-                'best_performance': best_AP_50_all}, save_mode_path)
+
+        save_mode_path = os.path.join(snapshot_path,
+                                      'epoch_{}_val_AP_50_all_{}.pth'.format(
+                                          epoch_num, round(AP_50_all, 4)))
+        logging.info('saving model with best performance {}'.format(AP_50_all))
+        utils.save_on_master({
+            'model': configs.model.state_dict(),
+            'optimizer': configs.optimizer.state_dict(),
+            'lr_scheduler': configs.lr_scheduler.state_dict(),
+            'epoch': epoch_num,
+            'best_performance': AP_50_all}, save_mode_path)
 
         if iter_num >= configs.max_iterations:
             break
@@ -130,7 +141,7 @@ def train(configs, snapshot_path):
 
 if __name__ == "__main__":
 
-    configs = Configs('./configs/mask_rcnn.ini')
+    configs = Configs('./configs/mask_rcnn_weak.ini')
 
     if not configs.deterministic:
         cudnn.benchmark = True
