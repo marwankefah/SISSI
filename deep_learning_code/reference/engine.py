@@ -25,7 +25,6 @@ category_id_to_name = {1: 'cell'}
 
 
 def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
-    train_loss_list = []
     configs.model.train()
 
     header = 'Epoch: [{}]'.format(epoch)

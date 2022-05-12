@@ -169,11 +169,15 @@ class Configs:
 
         self.train_transform = self.get_transform(True)
         self.val_transform = self.get_transform(False)
-        self.train_detections_transforms=self.get_transform_detection(True)
-        self.val_detections_transforms=self.get_transform_detection(False)
+        self.train_detections_transforms = self.get_transform_detection(True)
+        self.val_detections_transforms = self.get_transform_detection(False)
 
         self.best_performance = 0
         self.start_epoch = 0
+
+        if not self.train_mask:
+            self.model.roi_heads.mask_predictor = None
+
         if self.load_model:
             print(self.model_path)
             checkpoint = torch.load(self.model_path, map_location=self.device)
@@ -182,10 +186,6 @@ class Configs:
             self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
             self.start_epoch = checkpoint['epoch'] + 1
             self.best_performance = checkpoint['best_performance']
-
-
-        if not self.train_mask:
-            self.model.roi_heads.mask_predictor= None
 
     def update_lr(self, iter_num):
         if self.optim.lower() == 'sgd':
@@ -244,7 +244,7 @@ class Configs:
                 A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1, border_mode=0, value=0, mask_value=0),
                 ToTensorV2(),
             ]
-               , bbox_params={'format': 'pascal_voc', 'min_area': 0, 'min_visibility': 0,
+                , bbox_params={'format': 'pascal_voc', 'min_area': 0, 'min_visibility': 0,
                                'label_fields': ['category_id']})
         else:
             transforms = A.Compose(

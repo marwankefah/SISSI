@@ -60,11 +60,14 @@ def train(configs, snapshot_path):
     # past_score_thresh = configs.model.roi_heads.score_thresh
     # past_detections_per_img = configs.model.roi_heads.detections_per_img
     # past_nms_thresh = configs.model.roi_heads.nms_thresh
+    #
+    # configs.model.roi_heads.score_thresh = 0.45
+    # configs.model.roi_heads.detections_per_img = 250
+    # configs.model.roi_heads.nms_thresh = 0.3
 
-    # configs.model.roi_heads.score_thresh = 0.2
-    # configs.model.roi_heads.detections_per_img = 200
-    # configs.model.roi_heads.nms_thresh = 0.7
-
+    # evaluate(configs, 0, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
+    #          vis_every_iter=1)
+    #
     # configs.model.roi_heads.score_thresh = past_score_thresh
     # configs.model.roi_heads.detections_per_img = past_detections_per_img
     # configs.model.roi_heads.nms_thresh = past_nms_thresh
@@ -105,7 +108,7 @@ def train(configs, snapshot_path):
         if AP_50_all > best_AP_50_all:
             best_AP_50_all = AP_50_all
             save_mode_path = os.path.join(snapshot_path,
-                                          'epoch_{}_val_AP_75_all_{}.pth'.format(
+                                          'epoch_{}_val_AP_50_all_{}.pth'.format(
                                               epoch_num, round(best_AP_50_all, 4)))
             logging.info('saving model with best performance {}'.format(best_AP_50_all))
             utils.save_on_master({
