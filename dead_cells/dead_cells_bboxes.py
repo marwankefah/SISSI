@@ -49,8 +49,8 @@ for img, img_name in dead_images_raw:
             bbox["cell_name"].append("dead")
             bbox["x_min"].append(max(x - r - 5, 0))
             bbox["y_min"].append(max(y - r - 5, 0))
-            bbox["x_max"].append(min(x + r + 5, img.shape[0]-1))
-            bbox["y_max"].append(min(y + r + 5, img.shape[1]-1))
+            bbox["x_max"].append(min(x + r + 5, img.shape[1]-1))
+            bbox["y_max"].append(min(y + r + 5, img.shape[0]-1))
             i += 1
 
         bboxes = pd.DataFrame(bbox)
