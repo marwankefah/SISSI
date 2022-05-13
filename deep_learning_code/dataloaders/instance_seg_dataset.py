@@ -40,9 +40,10 @@ class chrisi_dataset(torch.utils.data.Dataset):
 
                 else:
                     bboxes_path_or_cache.append(bboxes_path)
-                self.img_list += img_list
-                self.bboxes_path_or_cache += bboxes_path_or_cache
-        self.sample_list = list(zip(self.img_list, bboxes_path_or_cache))
+            self.img_list += img_list
+            self.bboxes_path_or_cache += bboxes_path_or_cache
+
+        self.sample_list = list(zip(self.img_list, self.bboxes_path_or_cache))
 
     def __getitem__(self, idx):
         # load images and masks

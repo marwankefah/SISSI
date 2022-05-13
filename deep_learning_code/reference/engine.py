@@ -31,7 +31,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
     train_loss_dict = {'loss_classifier': 0, 'loss_box_reg': 0, 'loss_mask': 0, 'loss_objectness': 0,
                        'loss_rpn_box_reg': 0}
     lr_scheduler = None
-    outputs_list_dict=[]
+    # outputs_list_dict=[]
     if epoch == 0:
         warmup_factor = 1. / 1000
         warmup_iters = min(1000, len(data_loader) - 1)
@@ -70,7 +70,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
         writer.add_scalar('info/lr', configs.optimizer.param_groups[0]["lr"], epoch)
 
         # TODO check it make the functionality required
-        outputs_list_dict.append({target["image_id"].item(): output for target, output in zip(targets, outputs)})
+        # outputs_list_dict.append({target["image_id"].item(): output for target, output in zip(targets, outputs)})
 
         if iter_epoch % 20 == 0:
             # (epoch+1)*iter_epoch
@@ -101,7 +101,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
                                                                configs.optimizer.param_groups[0]["lr"],
                                                                train_losses_reduced) + "\t".join(loss_str))
 
-    return outputs_list_dict
+    return
 
 
 def _get_iou_types(model, has_mask):
@@ -124,6 +124,8 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20):
     header = 'Test: Epoch [{}]'.format(epoch)
     val_loss_dict = {'loss_classifier': 0, 'loss_box_reg': 0, 'loss_mask': 0, 'loss_objectness': 0,
                      'loss_rpn_box_reg': 0}
+    outputs_list_dict = []
+
     coco = get_coco_api_from_dataset(data_loader.dataset)
     iou_types = _get_iou_types(configs.model, configs.train_mask)
     coco_evaluator = CocoEvaluator(coco, iou_types)
@@ -143,10 +145,13 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20):
             # (epoch+1)*iter_epoch
             output_vis_to_tensorboard(images, targets1, outputs, (epoch + 1) * iter_per_epoch, writer,
                                       configs.train_mask)
+            logging.info('Evaluation [{}/{}] '.format(iter_per_epoch, total_iter_per_epoch))
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
 
         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
+
+        outputs_list_dict.append(res)
 
         coco_evaluator.update(res)
 
@@ -185,7 +190,7 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20):
                                                         val_losses_reduced) + "\t".join(loss_str))
 
     torch.set_num_threads(n_threads)
-    return coco_evaluator.coco_eval['bbox'].stats[1]
+    return coco_evaluator.coco_eval['bbox'].stats[1],outputs_list_dict
 
 
 def test(configs, epoch, data_loader, device, writer):
