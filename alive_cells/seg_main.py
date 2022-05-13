@@ -21,7 +21,7 @@ from utils.seed_detection import seed_detection
 from PIL import Image
 from test import save_mask_png
 
-cell_type = 'test'
+cell_type = 'inhib'
 data_dir = Path(
     "../data/chrisi/" + cell_type + "/"
 )
@@ -106,11 +106,11 @@ for image, cell_name in dead_images_raw:
 
     watershedInput = imposemin(magnitude / 255, cv2.bitwise_or(img5 // 255, th2 // 255))
 
-    # TODO implement seed instead to get coords(markers)
-    try:
-        mask = seed_detection(cell_gray, th2, sigma0=10, alpha=0.03)
-    except:
-        raise NameError(f"Error for {cell_name} ")
+    # # TODO implement seed instead to get coords(markers)
+    # try:
+    #     mask = seed_detection(cell_gray, th2, sigma0=10, alpha=0.03)
+    # except:
+    #     raise NameError(f"Error for {cell_name} ")
 
     ntol = 50  # Noise Tolerance.
     img_data = np.array(image).astype(np.float64)
@@ -123,6 +123,8 @@ for image, cell_name in dead_images_raw:
     local_max = find_local_maxima(img_data)
 
     y, x, regs = find_maxima(img_data, local_max, ntol)
+
+
     plt.figure(figsize=(16, 16))
     plt.imshow(image)
     plt.plot(x, y, 'r+')
@@ -196,6 +198,6 @@ for image, cell_name in dead_images_raw:
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-    save_mask_png(labels,cell_name,output_path)
+    # save_mask_png(labels,cell_name,output_path)
 
 cv2.destroyAllWindows()

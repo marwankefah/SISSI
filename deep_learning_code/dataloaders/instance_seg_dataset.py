@@ -7,38 +7,62 @@ import cv2
 
 
 class chrisi_dataset(torch.utils.data.Dataset):
-    def __init__(self, root, split, transforms):
+    def __init__(self, root, split, transforms, cache_labels=False):
         self.root = root
         self.transforms = transforms
         self.split = split
+        self.cache_labels = cache_labels
         # load all image files, sorting them to
         # ensure that they are aligned
+        # TODO need to be cleaned before publishing (abstract self.root easier)
+        self.bboxes_path_or_cache = []
+        self.img_list = []
 
-        images_dir = os.listdir(os.path.join(root, split))
-        # TODO to be abstracted
-        self.bboxes_dir_path = os.path.join(self.root, 'weak_labels', self.split)
+        for cell_type in self.split:
 
-        self.imgs = list(
-            sorted([string for string in images_dir if string.endswith(".jpg")]))
-        # self.bboxes = list(
-        #     sorted([string for string in self.bboxes_dir_path if string.endswith(".txt")]))
-        #
+            bboxes_dir_path = os.path.join(self.root, 'weak_labels')
+            image_dir_path = os.path.join(root, cell_type)
+            images_dir = os.listdir(image_dir_path)
+            img_list = list(
+                sorted([os.path.join(cell_type,string) for string in images_dir if string.endswith(".jpg")]))
+            bboxes_path_or_cache = []
+            for cell_name in img_list:
+                bboxes_path = os.path.join(bboxes_dir_path, cell_name.split('.')[-2] + '.txt')
+                if cache_labels:
+                    annotations = np.loadtxt(bboxes_path,
+                                             dtype={'names': ('cell_name', 'x_min', 'y_min', 'x_max', 'y_max'),
+                                                    'formats': ('U25', 'i4', 'i4', 'i4', 'i4')}, delimiter=' ')
+
+                    boxes = np.dstack(
+                        (annotations['x_min'], annotations['y_min'], annotations['x_max'], annotations['y_max']))
+                    boxes = boxes[0].tolist()
+                    bboxes_path_or_cache.append(boxes)
+
+                else:
+                    bboxes_path_or_cache.append(bboxes_path)
+                self.img_list += img_list
+                self.bboxes_path_or_cache += bboxes_path_or_cache
+        self.sample_list = list(zip(self.img_list, bboxes_path_or_cache))
 
     def __getitem__(self, idx):
         # load images and masks
-        img_path = os.path.join(self.root, self.split, self.imgs[idx])
+        img_path = os.path.join(self.root, self.sample_list[idx][0])
+        if self.cache_labels:
+            # cell_name =
+            boxes = self.sample_list[idx][1]
+        else:
+            bboxes_path = self.sample_list[idx][1]
+            annotations = np.loadtxt(bboxes_path,
+                                     dtype={'names': ('cell_name', 'x_min', 'y_min', 'x_max', 'y_max'),
+                                            'formats': ('U25', 'i4', 'i4', 'i4', 'i4')}, delimiter=' ')
 
-        bboxes_path = os.path.join(self.bboxes_dir_path, self.imgs[idx].split('.')[0] + '.txt')
+            boxes = np.dstack((annotations['x_min'], annotations['y_min'], annotations['x_max'], annotations['y_max']))
+            boxes = boxes[0].tolist()
 
         img = cv2.imread(img_path, cv2.IMREAD_COLOR)
-        annotations = np.loadtxt(bboxes_path,
-                                 dtype={'names': ('cell_name', 'x_min', 'y_min', 'x_max', 'y_max'),
-                                        'formats': ('U25', 'i4', 'i4', 'i4', 'i4')}, delimiter=' ')
-
-        boxes = np.dstack((annotations['x_min'], annotations['y_min'], annotations['x_max'], annotations['y_max']))
-        boxes = boxes[0].tolist()
         labels = [1] * len(boxes)
         target = {}
+
         if self.transforms is not None:
             img_np = np.array(img)
             if not img_np.dtype == np.uint8:
@@ -51,7 +75,6 @@ class chrisi_dataset(torch.utils.data.Dataset):
         boxes = result['bboxes']
         num_objs = len(boxes)
 
-
         img = result['image']
 
         # there is only one class
@@ -61,7 +84,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
 
-        masks = torch.empty((0,),dtype=torch.uint8)
+        masks = torch.empty((0,), dtype=torch.uint8)
 
         image_id = torch.tensor([idx])
         # suppose all instances are not crowd
@@ -74,10 +97,10 @@ class chrisi_dataset(torch.utils.data.Dataset):
         target["area"] = area
         target["iscrowd"] = iscrowd
 
-        return img, target
+        return img, target, 0
 
     def __len__(self):
-        return len(self.imgs)
+        return len(self.sample_list)
 
 
 class cell_pose_dataset(torch.utils.data.Dataset):
@@ -97,7 +120,7 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         # load images and masks
         img_path = os.path.join(self.root, self.split, self.imgs[idx])
         mask_path = os.path.join(self.root, self.split, self.masks[idx])
-
+        cell_name = self.imgs[idx]
         img = cv2.imread(img_path, cv2.IMREAD_COLOR)
         # img = np.stack((img,) * 3, axis=-1)
 
@@ -170,7 +193,7 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         target["area"] = area
         target["iscrowd"] = iscrowd
 
-        return img, target
+        return img, target, cell_name
 
     def __len__(self):
         return len(self.imgs)

@@ -98,6 +98,11 @@ class Configs:
             'network', 'lr_step_size', fallback=8)
         self.lr_gamma = config_file.getfloat(
             'network', 'lr_gamma', fallback=0.1)
+        self.label_correction = config_file.getboolean(
+            'network', 'label_correction', fallback=False)
+
+        self.label_correction_threshold = config_file.getfloat(
+            'network', 'label_correction_threshold', fallback=0.9)
 
         self.psuedoLabelsGenerationEpoch = config_file.getint(
             'network', 'psuedoLabelsGenerationEpoch', fallback=3)
@@ -241,6 +246,7 @@ class Configs:
                 A.Blur(),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
+                # TODO scale parameter tuning (no zoom out just zoom in)
                 A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1, border_mode=0, value=0, mask_value=0),
                 ToTensorV2(),
             ]

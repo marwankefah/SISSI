@@ -31,6 +31,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
     train_loss_dict = {'loss_classifier': 0, 'loss_box_reg': 0, 'loss_mask': 0, 'loss_objectness': 0,
                        'loss_rpn_box_reg': 0}
     lr_scheduler = None
+    outputs_list_dict=[]
     if epoch == 0:
         warmup_factor = 1. / 1000
         warmup_iters = min(1000, len(data_loader) - 1)
@@ -38,7 +39,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
         lr_scheduler = utils.warmup_lr_scheduler(configs.optimizer, warmup_iters, warmup_factor)
     total_iter_per_epoch = len(data_loader)
 
-    for iter_epoch, (images, targets) in enumerate(data_loader):
+    for iter_epoch, (images, targets, cell_names) in enumerate(data_loader):
         images = list(image.to(configs.device) for image in images)
 
         targets = [{k: v.to(configs.device) for k, v in t.items()} for t in targets]
@@ -68,9 +69,12 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
 
         writer.add_scalar('info/lr', configs.optimizer.param_groups[0]["lr"], epoch)
 
+        # TODO check it make the functionality required
+        outputs_list_dict.append({target["image_id"].item(): output for target, output in zip(targets, outputs)})
+
         if iter_epoch % 20 == 0:
             # (epoch+1)*iter_epoch
-            output_vis_to_tensorboard(images, targets, outputs, (epoch + 1) * iter_epoch, writer,configs.train_mask)
+            output_vis_to_tensorboard(images, targets, outputs, (epoch + 1) * iter_epoch, writer, configs.train_mask)
 
         train_loss_dict = Counter(train_loss_dict) + Counter(loss_dict_reduced)
 
@@ -97,10 +101,10 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
                                                                configs.optimizer.param_groups[0]["lr"],
                                                                train_losses_reduced) + "\t".join(loss_str))
 
-    return
+    return outputs_list_dict
 
 
-def _get_iou_types(model,has_mask):
+def _get_iou_types(model, has_mask):
     model_without_ddp = model
     if isinstance(model, torch.nn.parallel.DistributedDataParallel):
         model_without_ddp = model.module
@@ -111,7 +115,7 @@ def _get_iou_types(model,has_mask):
 
 
 @torch.no_grad()
-def evaluate(configs, epoch, data_loader, device, writer,vis_every_iter=20):
+def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20):
     n_threads = torch.get_num_threads()
     # FIXME (i need someone to fix me ) remove this and make paste_masks_in_image run on the GPU
     torch.set_num_threads(1)
@@ -121,10 +125,10 @@ def evaluate(configs, epoch, data_loader, device, writer,vis_every_iter=20):
     val_loss_dict = {'loss_classifier': 0, 'loss_box_reg': 0, 'loss_mask': 0, 'loss_objectness': 0,
                      'loss_rpn_box_reg': 0}
     coco = get_coco_api_from_dataset(data_loader.dataset)
-    iou_types = _get_iou_types(configs.model,configs.train_mask)
+    iou_types = _get_iou_types(configs.model, configs.train_mask)
     coco_evaluator = CocoEvaluator(coco, iou_types)
     total_iter_per_epoch = len(data_loader)
-    for iter_per_epoch, (images, targets) in enumerate(data_loader):
+    for iter_per_epoch, (images, targets, cell_names) in enumerate(data_loader):
         images = list(img.to(device) for img in images)
         targets1 = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
@@ -137,7 +141,8 @@ def evaluate(configs, epoch, data_loader, device, writer,vis_every_iter=20):
 
         if iter_per_epoch % vis_every_iter == 0:
             # (epoch+1)*iter_epoch
-            output_vis_to_tensorboard(images, targets1, outputs, (epoch + 1) * iter_per_epoch, writer,configs.train_mask)
+            output_vis_to_tensorboard(images, targets1, outputs, (epoch + 1) * iter_per_epoch, writer,
+                                      configs.train_mask)
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
 
@@ -192,7 +197,7 @@ def test(configs, epoch, data_loader, device, writer):
     logging.info('Testing with no annotations')
 
     total_iter_per_epoch = len(data_loader)
-    for iter_per_epoch, (images, targets) in enumerate(data_loader):
+    for iter_per_epoch, (images, targets, cell_names) in enumerate(data_loader):
         images = list(img.to(device) for img in images)
         targets1 = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
@@ -202,7 +207,8 @@ def test(configs, epoch, data_loader, device, writer):
 
         if iter_per_epoch % 10 == 0:
             # (epoch+1)*iter_epoch
-            output_vis_to_tensorboard(images, targets1, outputs, (epoch + 1) * iter_per_epoch, writer,configs.train_mask)
+            output_vis_to_tensorboard(images, targets1, outputs, (epoch + 1) * iter_per_epoch, writer,
+                                      configs.train_mask)
 
     torch.set_num_threads(n_threads)
 
@@ -239,7 +245,7 @@ def visualize(image, bboxes, category_ids, category_id_to_name):
     return img
 
 
-def output_vis_to_tensorboard(images, targets1, outputs, iter_per_epoch, writer,train_mask):
+def output_vis_to_tensorboard(images, targets1, outputs, iter_per_epoch, writer, train_mask):
     img = images[0].detach().cpu().numpy()
     writer.add_image('image', img, iter_per_epoch)
     img_gt_boxes_channel_last = np.moveaxis(images[0].detach().cpu().numpy(), 0, -1)
@@ -269,3 +275,41 @@ def output_vis_to_tensorboard(images, targets1, outputs, iter_per_epoch, writer,
         img_output_overlay = mask_overlay(img_gt_boxes_channel_last, maski)
         img_output_overlay_channel_first = np.moveaxis(img_output_overlay, -1, 0)
         writer.add_image('image_output_masks', img_output_overlay_channel_first, iter_per_epoch)
+
+
+# works with batch size =1
+def coco_evaluate(outputs_list_dict, coco, epoch, writer, train_mask=False):
+    n_threads = torch.get_num_threads()
+    # FIXME (i need someone to fix me ) remove this and make paste_masks_in_image run on the GPU
+    # torch.set_num_threads(1)
+
+    header = 'Training Evaluation: Epoch [{}]'.format(epoch)
+    iou_types = ["bbox"]
+    if train_mask:
+        iou_types.append('segm')
+
+    coco_evaluator = CocoEvaluator(coco, iou_types)
+
+    for res in outputs_list_dict:
+        # torch.cuda.synchronize()
+        # make it faster
+        coco_evaluator.update(res)
+
+    # gather the stats from all processes
+    coco_evaluator.synchronize_between_processes()
+
+    # accumulate predictions from all images
+    coco_evaluator.accumulate()
+    coco_evaluator.summarize()
+    writer.add_scalar('info/AP_0.5_BOX', coco_evaluator.coco_eval['bbox'].stats[1], epoch)
+    writer.add_scalar('info/AP_0.75_BOX', coco_evaluator.coco_eval['bbox'].stats[2], epoch)
+    writer.add_scalar('info/AR__BOX', coco_evaluator.coco_eval['bbox'].stats[8], epoch)
+    if train_mask:
+        writer.add_scalar('info/AP_0.5_SEG', coco_evaluator.coco_eval['segm'].stats[1], epoch)
+        writer.add_scalar('info/AP_0.75_SEG', coco_evaluator.coco_eval['segm'].stats[2], epoch)
+        writer.add_scalar('info/AR__SEG', coco_evaluator.coco_eval['segm'].stats[8], epoch)
+
+    logging.info('{}  finished AP 0.5:{} '.format(header, coco_evaluator.coco_eval['bbox'].stats[1]))
+
+    # torch.set_num_threads(n_threads)
+    return coco_evaluator.coco_eval['bbox'].stats[1]
