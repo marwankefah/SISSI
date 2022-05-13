@@ -43,8 +43,8 @@ def train(configs, snapshot_path):
 
     db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
-    db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, 'alive', configs.val_detections_transforms)
-    db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, 'test_labelled', configs.val_detections_transforms)
+    db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms)
+    db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'], configs.val_detections_transforms)
 
     chrisi_test_data_loader = torch.utils.data.DataLoader(
         db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,

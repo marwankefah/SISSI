@@ -34,6 +34,9 @@ from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset
 import reference.utils as utils
 from reference.engine import train_one_epoch, evaluate, test
 
+from deep_learning_code.reference.coco_utils import get_coco_api_from_dataset
+from deep_learning_code.reference.engine import coco_evaluate
+
 
 def train(configs, snapshot_path):
     configs.train_writer = SummaryWriter(snapshot_path + '/log')
@@ -46,14 +49,29 @@ def train(configs, snapshot_path):
     # db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
     # db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
 
-    db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, 'alive', configs.train_detections_transforms)
-    db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, 'dead', configs.train_detections_transforms)
+    db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.train_detections_transforms,
+                                     )
+    db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, ['dead'], configs.train_detections_transforms,
+                                    )
     # db_chrisi_inhib = chrisi_dataset(configs.chrisi_cells_root_path, 'inhib', configs.train_detections_transforms)
 
-    db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, 'test_labelled', configs.val_detections_transforms)
+    db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
+                                    configs.val_detections_transforms)
 
-    weak_label_chrisi_dataset = ConcatDataset(
-        [db_chrisi_alive, db_chrisi_dead])
+    # weak_label_chrisi_dataset = ConcatDataset(
+    #     [db_chrisi_alive, db_chrisi_dead])
+
+    weak_label_chrisi_dataset = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'],
+                                               configs.train_detections_transforms,
+                                               cache_labels=True)
+
+    weak_label_chrisi_dataset_val = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'],
+                                                   configs.val_detections_transforms,
+                                                   cache_labels=True)
+
+    initial_weak_labels_data_loader = torch.utils.data.DataLoader(
+        weak_label_chrisi_dataset_val, batch_size=configs.labelled_bs, shuffle=False, num_workers=configs.num_workers,
+        collate_fn=utils.collate_fn)
 
     weak_label_chrisi_dataloader = torch.utils.data.DataLoader(
         weak_label_chrisi_dataset, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
@@ -62,6 +80,8 @@ def train(configs, snapshot_path):
     chrisi_test_data_loader = torch.utils.data.DataLoader(
         db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
+
+    coco_initial_labels = get_coco_api_from_dataset(weak_label_chrisi_dataset_val)
 
     # score_thresh
     # nms_thresh
@@ -82,8 +102,6 @@ def train(configs, snapshot_path):
     # configs.model.roi_heads.detections_per_img = past_detections_per_img
     # configs.model.roi_heads.nms_thresh = past_nms_thresh
 
-
-
     configs.model.train()
 
     writer = configs.train_writer
@@ -97,20 +115,22 @@ def train(configs, snapshot_path):
     iterator = tqdm(range(configs.start_epoch, max_epoch), ncols=70)
     best_AP_50_all = configs.best_performance
 
+    train_iou_values = []
+    need_label_correction = False
+
     for epoch_num in iterator:
 
-        #TODO return iou values in training
-        train_one_epoch(configs, weak_label_chrisi_dataloader, epoch_num, print_freq=10, writer=writer)
+        # TODO return iou values in training
+        train_one_epoch(configs, weak_label_chrisi_dataloader, epoch_num, print_freq=10,
+                        writer=configs.train_writer)
+
         configs.lr_scheduler.step()
 
-        #TODO checkif it needs label correction
+        train_iou, outputs_list_dict = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
+                                                configs.val_writer,
+                                                vis_every_iter=2)
 
-
-
-        #TODO label correction saving to a folder with epoch_num
-
-
-        #TODO dataset_resetting labels and updating train_loader
+        train_iou_values.append(train_iou_values)
 
         # evaluate chrisi testset
         AP_50_all = evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
@@ -128,6 +148,30 @@ def train(configs, snapshot_path):
             'lr_scheduler': configs.lr_scheduler.state_dict(),
             'epoch': epoch_num,
             'best_performance': AP_50_all}, save_mode_path)
+
+        if configs.label_correction:
+            # TODO checkif it needs label correction
+            # if the flag is false, then check every time if it needs label correction
+            # if it is true one time, it will always be true
+            if not need_label_correction:
+                need_label_correction = utils.if_update(train_iou_values, epoch_num, n_epoch=max_epoch,
+                                                        threshold=configs.label_correction_threshold)
+
+            # it needs label correction, then output the label correction in a folder and reload it again
+            # no large cache memory
+            if need_label_correction:
+                # we can easily put the output bboxes in the cached labels?
+                for train_batch_output_dict in outputs_list_dict:
+                    for idx, model_single_output in train_batch_output_dict.items():
+                        # TODO that it is done correctly
+                        weak_label_chrisi_dataset.sample_list[idx][1] = model_single_output['boxes'].tolist()
+
+                weak_label_chrisi_dataloader = torch.utils.data.DataLoader(
+                    weak_label_chrisi_dataset, batch_size=configs.labelled_bs, shuffle=True,
+                    num_workers=configs.num_workers,
+                    collate_fn=utils.collate_fn)
+
+            # TODO dataset_resetting labels and updating train_loader
 
         if iter_num >= configs.max_iterations:
             break
