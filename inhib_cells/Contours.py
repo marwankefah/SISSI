@@ -39,8 +39,8 @@ for image, cell_name in dead_images_raw:
     #edges2 = feature.canny(image_gray, sigma=3)
 
     #SE = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    #edges1=edges1.astype(int)
-    #edges1 = cv2.morphologyEx(edges1*255, cv2.MORPH_OPEN, SE)
+    edges1 = edges1.astype(np.uint8)
+    edges1 = cv2.morphologyEx(edges1*255, cv2.MORPH_OPEN, SE)
 
     label_im = label(edges1)
     regions = regionprops(label_im)
@@ -72,8 +72,7 @@ for image, cell_name in dead_images_raw:
         minr, minc, maxr, maxc = props.bbox
         bx = (minc, maxc, maxc, minc, minc)
         by = (minr, minr, maxr, maxr, minr)
-        if (props.area_bbox>300):
+        if (props.area_bbox > 300):
             ax.plot(bx, by, '-b', linewidth=2.5)
 
     plt.show()
-
