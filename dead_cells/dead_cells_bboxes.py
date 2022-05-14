@@ -1,4 +1,3 @@
-from types import CellType
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -44,13 +43,13 @@ for img, img_name in dead_images_raw:
             cv2.circle(output, (x, y), r+2, (0, 255, 0), 1)
             cv2.circle(mask, (x, y), r+2, (i, i, i), -1)
 
-            cv2.rectangle(output, (x - r - 5, y - r - 5),
-                          (x + r + 5, y + r + 5), (255, 0, 0), 2)
+            cv2.rectangle(output, (x - r - 10, y - r - 10),
+                          (x + r + 10, y + r + 10), (255, 0, 0), 2)
             bbox["cell_name"].append("dead")
-            bbox["x_min"].append(max(x - r - 5, 0))
-            bbox["y_min"].append(max(y - r - 5, 0))
-            bbox["x_max"].append(min(x + r + 5, img.shape[1]-1))
-            bbox["y_max"].append(min(y + r + 5, img.shape[0]-1))
+            bbox["x_min"].append(max(x - r - 10, 0))
+            bbox["y_min"].append(max(y - r - 10, 0))
+            bbox["x_max"].append(min(x + r + 10, img.shape[1]-1))
+            bbox["y_max"].append(min(y + r + 10, img.shape[0]-1))
             i += 1
 
         bboxes = pd.DataFrame(bbox)

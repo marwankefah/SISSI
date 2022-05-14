@@ -10,13 +10,15 @@ import pandas as pd
 import cv2
 from pathlib import Path
 import matplotlib.pyplot as plt
+from feature import glcm_features
+from tqdm import tqdm
 
 
 def crop_w_bboxes(image, bboxes):
     cropped = []
     for (index, row) in bboxes.iterrows():
-        cropped.append((image[row["y_min"]:row["y_max"],
-                       row["x_min"]:row["x_max"]], row["cell_type"]))
+        cropped.append((index, row["cell_type"], image[row["y_min"]:row["y_max"],
+                       row["x_min"]:row["x_max"]]))
     return cropped
 
 
@@ -27,26 +29,41 @@ def get_all_cells(image_dir, bbox_dir):
         for img in image_dir.iterdir() if ".jpg" in str(img)
     ]
     col_list = ["cell_type", "x_min", "y_min", "x_max", "y_max"]
-    cropped = []
-    for img, img_name in all_images_raw:
+    cropped_all = []
+    print("Cropping images")
+    for img, img_name in tqdm(all_images_raw):
 
-        cell_num = img_name.split(".")[0]
-        bbox_path = bbox_dir/Path(f"{cell_num}.txt")
+        cell_name = img_name.split(".")[0]
+        bbox_path = bbox_dir/Path(f"{cell_name}.txt")
         bbox = pd.read_csv(
             bbox_path, sep=" ", header=None, names=col_list)
-        cropped.extend(crop_w_bboxes(image=img, bboxes=bbox))
-    return cropped
+        cropped = crop_w_bboxes(image=img, bboxes=bbox)
+        cropped = [(cell_name,) + elem for elem in cropped]
+
+        cropped_all.extend(cropped)
+    return cropped_all
 
 
 def extract_features():
     all_cells_raw = get_all_cells(
         Path("/Users/manasikattel/cell-segmentation/raw/named_images_type/dead"), Path("/Users/manasikattel/cell-segmentation/data/chrisi/dead/output/bbox"))
-    for (img, cell_type) in all_cells_raw:
-        plt.imshow(img)
-        plt.title(cell_type)
-        plt.show()
-    # all_cells_glcm = [(glcm(img), cell_type)
-    #                   for (img, cell_type) in all_cells_raw]
+    feature_dfs = []
+    print("Extracting features")
+    for (cell_name, index, cell_type, img) in tqdm(all_cells_raw):
+        # plt.imshow(img)
+        # plt.title(cell_type + str(", ") + cell_name +
+        #           str(", Cell no.: ") + str(index))
+        # plt.show()
+        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        glcm_features_dict = glcm_features(gray_img)
+        feature_df = pd.DataFrame(glcm_features_dict)
+        feature_df["cell_name"] = cell_name
+        feature_df["cell_no"] = index
+        feature_df["cell_type"] = cell_type
+        feature_dfs.append(feature_df)
+
+    features = pd.concat(feature_dfs)
+    # breakpoint()
 
 
 # %%
