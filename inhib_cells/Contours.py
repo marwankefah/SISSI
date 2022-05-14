@@ -38,21 +38,22 @@ for image, cell_name in dead_images_raw:
     edges1 = feature.canny(image_gray, sigma=0.1)
     #edges2 = feature.canny(image_gray, sigma=3)
 
-    #SE = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    SE = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
     edges1 = edges1.astype(np.uint8)
-    edges1 = cv2.morphologyEx(edges1*255, cv2.MORPH_OPEN, SE)
+    edges1 = cv2.morphologyEx(edges1*255, cv2.MORPH_CLOSE, SE)
 
-    label_im = label(edges1)
+
+    label_im = label(edges1, connectivity=2)
     regions = regionprops(label_im)
 
     #ret, markers = cv2.connectedComponents(label_im)
     #markers = cv2.watershed(image, markers)
 
-    fig, (ax0, ax1, ax2) = plt.subplots(1, 3)
-    ax0.imshow(image_gray)
-    ax1.imshow(edges1)
-    ax2.imshow(label_im)
-    plt.show()
+    #fig, (ax0, ax1, ax2) = plt.subplots(1, 3)
+    #ax0.imshow(image_gray)
+    #ax1.imshow(edges1)
+    #ax2.imshow(label_im)
+    #plt.show()
     # %%
     fig, ax = plt.subplots()
     ax.imshow(image, cmap=plt.cm.gray)
@@ -72,7 +73,7 @@ for image, cell_name in dead_images_raw:
         minr, minc, maxr, maxc = props.bbox
         bx = (minc, maxc, maxc, minc, minc)
         by = (minr, minr, maxr, maxr, minr)
-        if (props.area_bbox > 300):
+        if (props.area_bbox > 150):
             ax.plot(bx, by, '-b', linewidth=2.5)
 
     plt.show()
