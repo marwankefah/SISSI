@@ -13,6 +13,8 @@ from skimage.color import rgb2gray
 from skimage import measure
 from pathlib import Path
 from skimage.measure import label, regionprops
+from utils.preprocess import illumination_correction
+
 from skimage.filters import gaussian
 # %%
 # Generate an initial image with two overlapping circles
@@ -35,10 +37,13 @@ dead_images_raw.remove([None, '.gitignore'])
 
 for image, cell_name in dead_images_raw:
     image_gray = rgb2gray(image)
-    edges1 = feature.canny(image_gray, sigma=0.1)
+    cell_illumination_corrected = illumination_correction(image_gray)
+
+    edges1 = feature.canny(cell_illumination_corrected, sigma=0.1)
+
     #edges2 = feature.canny(image_gray, sigma=3)
 
-    SE = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    SE = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
     edges1 = edges1.astype(np.uint8)
     edges1 = cv2.morphologyEx(edges1*255, cv2.MORPH_CLOSE, SE)
 
@@ -73,7 +78,7 @@ for image, cell_name in dead_images_raw:
         minr, minc, maxr, maxc = props.bbox
         bx = (minc, maxc, maxc, minc, minc)
         by = (minr, minr, maxr, maxr, minr)
-        if (props.area_bbox > 150):
+        if (props.area_bbox > 300):
             ax.plot(bx, by, '-b', linewidth=2.5)
 
     plt.show()
