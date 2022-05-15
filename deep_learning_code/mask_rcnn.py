@@ -116,7 +116,9 @@ def train(configs, snapshot_path):
                 'optimizer': configs.optimizer.state_dict(),
                 'lr_scheduler': configs.lr_scheduler.state_dict(),
                 'epoch': epoch_num,
-                'best_performance': best_AP_50_all}, save_mode_path)
+                'best_performance': AP_50_all,
+                'train_iou_values': configs.train_iou_values,
+                'need_label_correction': configs.need_label_correction}, save_mode_path)
 
         if iter_num >= configs.max_iterations:
             break

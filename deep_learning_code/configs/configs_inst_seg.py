@@ -164,6 +164,8 @@ class Configs:
 
         # self.lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[1, 10],
         #                                                          gamma=0.1)
+        self.need_label_correction = False
+        self.train_iou_values = []
 
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(
             self.optimizer, step_size=self.lr_step_size, gamma=self.lr_gamma)
@@ -191,6 +193,8 @@ class Configs:
             self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
             self.start_epoch = checkpoint['epoch'] + 1
             self.best_performance = checkpoint['best_performance']
+            self.train_iou_values = checkpoint['train_iou_values']
+            self.need_label_correction = checkpoint['need_label_correction']
 
     def update_lr(self, iter_num):
         if self.optim.lower() == 'sgd':

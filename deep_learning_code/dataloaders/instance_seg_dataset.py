@@ -1,5 +1,7 @@
 import logging
 import os
+import random
+
 import numpy as np
 import torch
 from PIL import Image
@@ -7,10 +9,11 @@ import cv2
 
 
 class chrisi_dataset(torch.utils.data.Dataset):
-    def __init__(self, root, split, transforms, cache_labels=False):
+    def __init__(self, root, split, transforms, cache_labels=False, shuffle=False, patch_size=[512, 512]):
         self.root = root
         self.transforms = transforms
         self.split = split
+        self.patch_size = patch_size
         self.cache_labels = cache_labels
         # load all image files, sorting them to
         # ensure that they are aligned
@@ -20,11 +23,11 @@ class chrisi_dataset(torch.utils.data.Dataset):
 
         for cell_type in self.split:
 
-            bboxes_dir_path = os.path.join(self.root, 'weak_labels')
+            bboxes_dir_path = os.path.join(self.root, 'weak_labels_reduced_nms')
             image_dir_path = os.path.join(root, cell_type)
             images_dir = os.listdir(image_dir_path)
             img_list = list(
-                sorted([os.path.join(cell_type,string) for string in images_dir if string.endswith(".jpg")]))
+                sorted([os.path.join(cell_type, string) for string in images_dir if string.endswith(".jpg")]))
             bboxes_path_or_cache = []
             for cell_name in img_list:
                 bboxes_path = os.path.join(bboxes_dir_path, cell_name.split('.')[-2] + '.txt')
@@ -44,6 +47,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
             self.bboxes_path_or_cache += bboxes_path_or_cache
 
         self.sample_list = list(zip(self.img_list, self.bboxes_path_or_cache))
+        self.img_orig_size = np.zeros((len(self.img_list),2))
 
     def __getitem__(self, idx):
         # load images and masks
@@ -61,6 +65,23 @@ class chrisi_dataset(torch.utils.data.Dataset):
             boxes = boxes[0].tolist()
 
         img = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        # TODO abstract and find another solution
+        if self.img_orig_size[idx].any() != 0:
+            self.img_orig_size[idx] = (img.shape[0], img.shape[1])
+
+        boxes_post_process = []
+        for box in boxes:
+            xmin = box[0]
+            ymin = box[1]
+            xmax = box[2]
+            ymax = box[3]
+            if xmin < xmax and ymin < ymax and xmin >= 0 and ymin >= 0 and xmax < img.shape[
+                1] and ymax < img.shape[0]:
+                boxes_post_process.append(box)
+            else:
+                print(xmin, xmax, ymin, ymax, img.shape)
+
+        boxes = boxes_post_process
         labels = [1] * len(boxes)
         target = {}
 

@@ -147,7 +147,9 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20):
                                       configs.train_mask)
             logging.info('Evaluation [{}/{}] '.format(iter_per_epoch, total_iter_per_epoch))
 
+
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
+
 
         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
 

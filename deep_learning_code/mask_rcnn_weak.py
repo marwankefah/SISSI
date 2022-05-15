@@ -22,6 +22,8 @@ from tqdm import tqdm
 from configs.configs import *
 from dataloaders.dataset import (ddsm_dataset_labelled, BaseFetaDataSets, RandomGenerator, ResizeTransform,
                                  TwoStreamBatchSampler)
+import odach as oda
+from torchvision.ops import boxes as box_ops
 from configs.configs import Configs
 from monai.visualize import plot_2d_or_3d_image
 from medpy import metric
@@ -58,14 +60,11 @@ def train(configs, snapshot_path):
     db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
                                     configs.val_detections_transforms)
 
-    # weak_label_chrisi_dataset = ConcatDataset(
-    #     [db_chrisi_alive, db_chrisi_dead])
-
-    weak_label_chrisi_dataset = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'],
+    weak_label_chrisi_dataset = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead'],
                                                configs.train_detections_transforms,
                                                cache_labels=True)
 
-    weak_label_chrisi_dataset_val = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'],
+    weak_label_chrisi_dataset_val = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead'],
                                                    configs.val_detections_transforms,
                                                    cache_labels=True)
 
@@ -81,7 +80,7 @@ def train(configs, snapshot_path):
         db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
-    coco_initial_labels = get_coco_api_from_dataset(weak_label_chrisi_dataset_val)
+    # coco_initial_labels = get_coco_api_from_dataset(weak_label_chrisi_dataset_val)
 
     # score_thresh
     # nms_thresh
@@ -102,6 +101,9 @@ def train(configs, snapshot_path):
     # configs.model.roi_heads.detections_per_img = past_detections_per_img
     # configs.model.roi_heads.nms_thresh = past_nms_thresh
 
+    # tta = [oda.HorizontalFlip(), oda.VerticalFlip(), oda.Rotate90Left(), oda.Multiply(0.9), oda.Multiply(1.1)]
+    # tta_model = oda.TTAWrapper(configs.model, tta)
+
     configs.model.train()
 
     writer = configs.train_writer
@@ -115,9 +117,6 @@ def train(configs, snapshot_path):
     iterator = tqdm(range(configs.start_epoch, max_epoch), ncols=70)
     best_AP_50_all = configs.best_performance
 
-    train_iou_values = []
-    need_label_correction = False
-
     for epoch_num in iterator:
 
         # TODO return iou values in training
@@ -128,14 +127,13 @@ def train(configs, snapshot_path):
 
         train_iou, outputs_list_dict = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
                                                 configs.val_writer,
-                                                vis_every_iter=2)
+                                                vis_every_iter=5)
 
-        train_iou_values.append(train_iou_values)
+        configs.train_iou_values.append(train_iou)
 
         # evaluate chrisi testset
-        AP_50_all = evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
-                             vis_every_iter=1)
-
+        AP_50_all, _ = evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
+                                vis_every_iter=1)
         # test(configs, epoch_num, alive_data_loader, configs.device, configs.alive_writer)  # AP iou 0.75--all bbox
 
         save_mode_path = os.path.join(snapshot_path,
@@ -147,31 +145,60 @@ def train(configs, snapshot_path):
             'optimizer': configs.optimizer.state_dict(),
             'lr_scheduler': configs.lr_scheduler.state_dict(),
             'epoch': epoch_num,
-            'best_performance': AP_50_all}, save_mode_path)
+            'best_performance': AP_50_all,
+            'train_iou_values': configs.train_iou_values,
+            'need_label_correction': configs.need_label_correction}, save_mode_path)
 
         if configs.label_correction:
-            # TODO checkif it needs label correction
             # if the flag is false, then check every time if it needs label correction
             # if it is true one time, it will always be true
-            if not need_label_correction:
-                need_label_correction = utils.if_update(train_iou_values, epoch_num, n_epoch=max_epoch,
-                                                        threshold=configs.label_correction_threshold)
+            if not configs.need_label_correction:
+                configs.need_label_correction = utils.if_update(configs.train_iou_values, epoch_num, n_epoch=max_epoch,
+                                                                threshold=configs.label_correction_threshold)
 
             # it needs label correction, then output the label correction in a folder and reload it again
             # no large cache memory
-            if need_label_correction:
+            if configs.need_label_correction:
+                logging.info('Label correction........')
                 # we can easily put the output bboxes in the cached labels?
                 for train_batch_output_dict in outputs_list_dict:
                     for idx, model_single_output in train_batch_output_dict.items():
-                        # TODO that it is done correctly
-                        weak_label_chrisi_dataset.sample_list[idx][1] = model_single_output['boxes'].tolist()
+                        # TODO that it is done correctly/do nMS and score threshold but just on function
+                        # remove low scoring boxes
+                        boxes = model_single_output['boxes']
+                        scores = model_single_output['scores']
+                        labels = model_single_output['labels']
+                        inds = torch.where(scores > 0.5)[0]
+                        boxes, scores, labels = boxes[inds], scores[inds], labels[inds]
+                        # # remove empty boxes
+                        keep = box_ops.remove_small_boxes(boxes, min_size=1e-2)
+                        boxes, scores, labels = boxes[keep], scores[keep], labels[keep]
+                        #
+                        # non-maximum suppression, independently done per class
+                        keep = box_ops.batched_nms(boxes, scores, labels, 0.35)
+                        # keep only topk scoring predictions
+                        keep = keep[: 200]
+                        boxes, scores, labels = boxes[keep], scores[keep], labels[keep]
+                        # TODO boxes are for the image of 512x512
+                        y_scale = weak_label_chrisi_dataset.img_orig_size[idx][0]
+                        x_scale = weak_label_chrisi_dataset.img_orig_size[idx][1]
+                        xmin, ymin, xmax, ymax = boxes.unbind(1)
 
+                        xmin = xmin * x_scale
+                        xmax = xmax * x_scale
+                        ymin = ymin * y_scale
+                        ymax = ymax * y_scale
+                        boxes = torch.stack((xmin, ymin, xmax, ymax), dim=1)
+
+                        if torch.numel(boxes) != 0:
+                            weak_label_chrisi_dataset.sample_list[idx] = (
+                                weak_label_chrisi_dataset.sample_list[idx][0], boxes.tolist())
+                        else:
+                            logging.info('image with id {} have no output'.format(idx))
                 weak_label_chrisi_dataloader = torch.utils.data.DataLoader(
                     weak_label_chrisi_dataset, batch_size=configs.labelled_bs, shuffle=True,
                     num_workers=configs.num_workers,
                     collate_fn=utils.collate_fn)
-
-            # TODO dataset_resetting labels and updating train_loader
 
         if iter_num >= configs.max_iterations:
             break
