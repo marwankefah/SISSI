@@ -321,3 +321,72 @@ def coco_evaluate(outputs_list_dict, coco, epoch, writer, train_mask=False):
 
     # torch.set_num_threads(n_threads)
     return coco_evaluator.coco_eval['bbox'].stats[1]
+
+
+from torchvision.ops import boxes as box_ops
+
+
+def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_num, max_epoch):
+    if configs.label_correction or len(configs.train_iou_values) != 0:
+        # if the flag is false, then check every time if it needs label correction
+        # if it is true one time, it will always be true
+        if not configs.need_label_correction:
+            configs.need_label_correction = utils.if_update(configs.train_iou_values, epoch_num, n_epoch=max_epoch,
+                                                            threshold=configs.label_correction_threshold)
+
+        # it needs label correction, then output the label correction in a folder and reload it again
+        # no large cache memory
+        if configs.need_label_correction:
+            logging.info('Label correction........')
+            # we can easily put the output bboxes in the cached labels?
+            for train_batch_output_dict in outputs_list_dict:
+                for idx, model_single_output in train_batch_output_dict.items():
+                    # remove low scoring boxes
+                    boxes = model_single_output['boxes']
+                    scores = model_single_output['scores']
+                    labels = model_single_output['labels']
+                    inds = torch.where(scores > 0.25)[0]
+                    boxes, scores, labels = boxes[inds], scores[inds], labels[inds]
+                    # # remove empty boxes
+                    keep = box_ops.remove_small_boxes(boxes, min_size=1e-2)
+                    boxes, scores, labels = boxes[keep], scores[keep], labels[keep]
+                    #
+                    # non-maximum suppression, independently done per class
+                    keep = box_ops.batched_nms(boxes, scores, labels, 0.3)
+                    # keep only topk scoring predictions
+                    keep = keep[: 200]
+                    boxes, scores, labels = boxes[keep], scores[keep], labels[keep]
+
+                    y_scale = (model_single_output['image_size'][0] - 1) / configs.patch_size[0]
+                    x_scale = (model_single_output['image_size'][1] - 1) / configs.patch_size[1]
+                    xmin, ymin, xmax, ymax = boxes.unbind(1)
+
+                    xmin = xmin * x_scale
+                    xmax = xmax * x_scale
+                    ymin = ymin * y_scale
+                    ymax = ymax * y_scale
+                    boxes = torch.stack((xmin, ymin, xmax, ymax), dim=1)
+                    # TODO add label smoothing also?
+                    if torch.numel(boxes) != 0:
+                        weak_label_chrisi_dataset.sample_list[idx] = (
+                            weak_label_chrisi_dataset.sample_list[idx][0], boxes.tolist())
+                    else:
+                        logging.info('image with id {} have no output'.format(idx))
+
+
+import os
+
+
+def save_check_point(configs, epoch_num, AP_50_all, snapshot_path):
+    save_mode_path = os.path.join(snapshot_path,
+                                  'epoch_{}_val_AP_50_all_{}.pth'.format(
+                                      epoch_num, round(AP_50_all, 4)))
+    logging.info('saving model with best performance {}'.format(AP_50_all))
+    utils.save_on_master({
+        'model': configs.model.state_dict(),
+        'optimizer': configs.optimizer.state_dict(),
+        'lr_scheduler': configs.lr_scheduler.state_dict(),
+        'epoch': epoch_num,
+        'best_performance': AP_50_all,
+        'train_iou_values': configs.train_iou_values,
+        'need_label_correction': configs.need_label_correction}, save_mode_path)
