@@ -1,5 +1,6 @@
 
 # %%
+
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
@@ -34,6 +35,7 @@ dead_images_raw = [
     [cv2.imread(str(img)), str(img).split('\\')[-1]] for img in data_dir.iterdir()
 ]
 dead_images_raw.remove([None, '.gitignore'])
+boxeslist=[]
 
 for image, cell_name in dead_images_raw:
     image_gray = rgb2gray(image)
@@ -79,6 +81,8 @@ for image, cell_name in dead_images_raw:
         bx = (minc, maxc, maxc, minc, minc)
         by = (minr, minr, maxr, maxr, minr)
         if (props.area_bbox > 300):
+            boxeslist.append([bx, by])
             ax.plot(bx, by, '-b', linewidth=2.5)
+
 
     plt.show()
