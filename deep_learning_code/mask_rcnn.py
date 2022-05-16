@@ -30,8 +30,7 @@ from configs.configs_inst_seg import Configs
 from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset, chrisi_dataset
 
 import reference.utils as utils
-from reference.engine import train_one_epoch, evaluate, test,save_check_point
-
+from reference.engine import train_one_epoch, evaluate, test, save_check_point
 
 
 def train(configs, snapshot_path):
@@ -48,7 +47,8 @@ def train(configs, snapshot_path):
     db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms)
     db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, ['dead'], configs.val_detections_transforms)
 
-    db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'], configs.val_detections_transforms)
+    db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
+                                    configs.val_detections_transforms)
 
     chrisi_test_data_loader = torch.utils.data.DataLoader(
         db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
@@ -103,22 +103,23 @@ def train(configs, snapshot_path):
 
         train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
         configs.lr_scheduler.step()
-        AP_50_all,_ = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
+        AP_50_all, _ = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
-        # evaluate(configs, epoch_num, alive_data_loader, configs.device,
-        #          configs.alive_writer,
-        #          vis_every_iter=20)
-        #
-        # evaluate(configs, epoch_num, dead_data_loader, configs.device,
-        #          configs.dead_writer,
-        #          vis_every_iter=20)
+        evaluate(configs, epoch_num, alive_data_loader, configs.device,
+                 configs.alive_writer,
+                 vis_every_iter=20)
 
-        #evaluate chrisi testset
+        evaluate(configs, epoch_num, dead_data_loader, configs.device,
+                 configs.dead_writer,
+                 vis_every_iter=20)
+
+        # evaluate chrisi testset
         evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
                  vis_every_iter=1)  # AP iou 0.75--all bbox
 
         save_check_point(configs, epoch_num, AP_50_all, snapshot_path)
 
+        configs.lr_scheduler.step(AP_50_all)
 
         if iter_num >= configs.max_iterations:
             break

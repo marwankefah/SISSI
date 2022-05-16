@@ -150,7 +150,6 @@ def train(configs, snapshot_path):
 
         correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_num, max_epoch)
 
-
         weak_label_chrisi_dataloader = torch.utils.data.DataLoader(
             weak_label_chrisi_dataset, batch_size=configs.labelled_bs, shuffle=True,
             num_workers=configs.num_workers,
@@ -159,7 +158,7 @@ def train(configs, snapshot_path):
         train_one_epoch(configs, weak_label_chrisi_dataloader, epoch_num, print_freq=10,
                         writer=configs.train_writer)
 
-        configs.lr_scheduler.step()
+        configs.lr_scheduler.step(train_iou)
 
         configs.train_iou_values.append(train_iou)
 

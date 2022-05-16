@@ -11,6 +11,7 @@ import torch.optim as optim
 
 
 import reference.transforms as T
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchvision_our.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision_our.models.detection.mask_rcnn import MaskRCNNPredictor, maskrcnn_resnet50_fpn
 
@@ -172,9 +173,9 @@ class Configs:
         self.need_label_correction = False
         self.train_iou_values = []
 
-        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(
-            self.optimizer, step_size=self.lr_step_size, gamma=self.lr_gamma)
-
+        # self.lr_scheduler = torch.optim.lr_scheduler.StepLR(
+        #     self.optimizer, step_size=self.lr_step_size, gamma=self.lr_gamma)
+        self.lr_scheduler = ReduceLROnPlateau(self.optimizer, 'max')
         # writers
         self.train_writer = None
         self.val_writer = None
