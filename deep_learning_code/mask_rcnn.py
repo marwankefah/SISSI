@@ -30,9 +30,8 @@ from configs.configs_inst_seg import Configs
 from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset, chrisi_dataset
 
 import reference.utils as utils
-from reference.engine import train_one_epoch, evaluate, test
+from reference.engine import train_one_epoch, evaluate, test,save_check_point
 
-from deep_learning_code.reference.engine import save_check_point
 
 
 def train(configs, snapshot_path):
@@ -104,15 +103,15 @@ def train(configs, snapshot_path):
 
         train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
         configs.lr_scheduler.step()
-        AP_50_all = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
+        AP_50_all,_ = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
-        evaluate(configs, epoch_num, alive_data_loader, configs.device,
-                 configs.alive_writer,
-                 vis_every_iter=20)
-
-        evaluate(configs, epoch_num, dead_data_loader, configs.device,
-                 configs.dead_writer,
-                 vis_every_iter=20)
+        # evaluate(configs, epoch_num, alive_data_loader, configs.device,
+        #          configs.alive_writer,
+        #          vis_every_iter=20)
+        #
+        # evaluate(configs, epoch_num, dead_data_loader, configs.device,
+        #          configs.dead_writer,
+        #          vis_every_iter=20)
 
         #evaluate chrisi testset
         evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,

@@ -36,8 +36,7 @@ from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset
 import reference.utils as utils
 from reference.engine import train_one_epoch, evaluate, test
 
-from deep_learning_code.reference.coco_utils import get_coco_api_from_dataset
-from deep_learning_code.reference.engine import coco_evaluate, correct_labels, save_check_point
+from reference.engine import coco_evaluate, correct_labels, save_check_point
 
 
 def train(configs, snapshot_path):

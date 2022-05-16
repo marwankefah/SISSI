@@ -100,7 +100,11 @@ class chrisi_dataset(torch.utils.data.Dataset):
         labels = torch.as_tensor(result['category_id'], dtype=torch.int64)
 
         # convert everything into a torch.Tensor
-        boxes = torch.as_tensor(boxes, dtype=torch.float32)
+        if len(boxes) != 0:
+            boxes = torch.as_tensor(boxes, dtype=torch.float32)
+        else:
+            print('image {} with no boxes'.format(img_path))
+            boxes = torch.empty((0, 4),dtype=torch.float32)
         area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
 
         masks = torch.empty((0,), dtype=torch.uint8)
@@ -194,7 +198,11 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         labels = torch.ones((num_objs - len(invalid_ids),), dtype=torch.int64)
 
         # convert everything into a torch.Tensor
-        boxes = torch.as_tensor(boxes, dtype=torch.float32)
+        if len(boxes) != 0:
+            boxes = torch.as_tensor(boxes, dtype=torch.float32)
+        else:
+            print('image {} with no boxes'.format(img_path))
+            boxes = torch.empty((0, 4),dtype=torch.float32)
         # there is only one class
         masks = torch.as_tensor(masks, dtype=torch.uint8)
 
