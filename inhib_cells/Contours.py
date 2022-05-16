@@ -1,6 +1,3 @@
-
-# %%
-
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
@@ -15,17 +12,9 @@ from skimage import measure
 from pathlib import Path
 from skimage.measure import label, regionprops
 from utils.preprocess import illumination_correction
+from alive_cells.test import nms
+import pandas as pd
 
-from skimage.filters import gaussian
-# %%
-# Generate an initial image with two overlapping circles
-# x, y = np.indices((80, 80))
-# x1, y1, x2, y2 = 28, 28, 44, 52
-# r1, r2 = 16, 20
-# mask_circle1 = (x - x1) ** 2 + (y - y1) ** 2 < r1**2
-# mask_circle2 = (x - x2) ** 2 + (y - y2) ** 2 < r2**2
-# image = np.logical_or(mask_circle1, mask_circle2)
-# %%
 
 cell_type = 'inhib'
 data_dir = Path(
@@ -35,15 +24,13 @@ dead_images_raw = [
     [cv2.imread(str(img)), str(img).split('\\')[-1]] for img in data_dir.iterdir()
 ]
 dead_images_raw.remove([None, '.gitignore'])
-boxeslist=[]
+
 
 for image, cell_name in dead_images_raw:
     image_gray = rgb2gray(image)
     cell_illumination_corrected = illumination_correction(image_gray)
 
     edges1 = feature.canny(cell_illumination_corrected, sigma=0.1)
-
-    #edges2 = feature.canny(image_gray, sigma=3)
 
     SE = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
     edges1 = edges1.astype(np.uint8)
@@ -53,17 +40,11 @@ for image, cell_name in dead_images_raw:
     label_im = label(edges1, connectivity=2)
     regions = regionprops(label_im)
 
-    #ret, markers = cv2.connectedComponents(label_im)
-    #markers = cv2.watershed(image, markers)
-
-    #fig, (ax0, ax1, ax2) = plt.subplots(1, 3)
-    #ax0.imshow(image_gray)
-    #ax1.imshow(edges1)
-    #ax2.imshow(label_im)
-    #plt.show()
-    # %%
     fig, ax = plt.subplots()
     ax.imshow(image, cmap=plt.cm.gray)
+
+    boxeslist = {"cell_name": [], "x_min": [], "y_min": [], "x_max": [], "y_max": []}
+    boxes_area = []
 
     for props in regions:
         y0, x0 = props.centroid
@@ -80,9 +61,19 @@ for image, cell_name in dead_images_raw:
         minr, minc, maxr, maxc = props.bbox
         bx = (minc, maxc, maxc, minc, minc)
         by = (minr, minr, maxr, maxr, minr)
-        if (props.area_bbox > 300):
-            boxeslist.append([bx, by])
-            ax.plot(bx, by, '-b', linewidth=2.5)
+        if (props.area_bbox > 400):
+            #boxeslist.append([bx, by])
+            #ax.plot(bx, by, '-b', linewidth=2.5)
+            boxeslist.append([minc, minr, maxc, maxr])
 
+            boxeslist["x_min"].append(minc)
+            boxeslist["y_min"].append(minr)
+            boxeslist["x_max"].append(maxc)
+            boxeslist["y_max"].append(maxr)
+            boxes_area.append(props.area_bbox)
+
+    bboxes = pd.DataFrame(boxeslist)
+    bboxes_numpy = bboxes[["x_min", "y_min", "x_max", "y_max"]].to_numpy()
+    bboxes_post_nms = np.asarray(nms(bboxes_numpy, np.ones_like(boxes_area), 0.15)[0])
 
     plt.show()
