@@ -103,7 +103,7 @@ def train(configs, snapshot_path):
 
         train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
 
-        AP_50_all, _ = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
+        evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
         evaluate(configs, epoch_num, alive_data_loader, configs.device,
                  configs.alive_writer,
@@ -114,7 +114,7 @@ def train(configs, snapshot_path):
                  vis_every_iter=20)
 
         # evaluate chrisi testset
-        evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
+        AP_50_all, _=evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
                  vis_every_iter=1)  # AP iou 0.75--all bbox
 
         save_check_point(configs, epoch_num, AP_50_all, snapshot_path)

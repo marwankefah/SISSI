@@ -23,7 +23,8 @@ category_ids = [1]
 # to visualize the class label for the bounding box on the image
 category_id_to_name = {1: 'cell'}
 
-def train_mixed_one_epoch(configs,data_loader_labeled,data_loader_weak,epoch,print_freq,writer):
+
+def train_mixed_one_epoch(configs, data_loader_labeled, data_loader_weak, epoch, print_freq, writer):
     configs.model.train()
 
     header = 'Epoch: [{}]'.format(epoch)
@@ -38,11 +39,10 @@ def train_mixed_one_epoch(configs,data_loader_labeled,data_loader_weak,epoch,pri
         sampled_weak_labelled_batch = weak_labeled_data_loader_iter.next()
         # images, targets, cell_names = images
 
-        input = torch.cat((sampled_labelled_batch[0],sampled_weak_labelled_batch[0] ), 0)
-        label = torch.cat((sampled_labelled_batch[1],sampled_weak_labelled_batch[1] ), 0)
+        input = sampled_labelled_batch[0]+sampled_weak_labelled_batch[0]
+        label = sampled_labelled_batch[1]+sampled_weak_labelled_batch[1]
 
-        loss_dict_reduced, loss_value = train_one_iter(configs, i_batch, epoch, input, label)
-
+        loss_dict_reduced, loss_value = train_one_iter(configs, i_batch, epoch, input, label,writer)
 
         writer.add_scalar('info/lr', configs.optimizer.param_groups[0]["lr"], epoch)
 
@@ -89,7 +89,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
 
     for iter_epoch, (images, targets, cell_names) in enumerate(data_loader):
 
-        loss_dict_reduced, loss_value = train_one_iter(configs, iter_epoch, epoch, images, targets)
+        loss_dict_reduced, loss_value = train_one_iter(configs, iter_epoch, epoch, images, targets,writer)
 
         if lr_scheduler is not None:
             lr_scheduler.step()
@@ -105,7 +105,6 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
 
         logging.info('{} [{}/{}] loss:{} '.format(header, iter_epoch, total_iter_per_epoch,
                                                   round(loss_value, 4)) + "\t".join(loss_str))
-
 
     train_losses_reduced = sum(loss for loss in train_loss_dict.values()) / total_iter_per_epoch
     loss_str = []
@@ -124,7 +123,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
     return
 
 
-def train_one_iter(configs, iter_epoch, epoch, images, targets):
+def train_one_iter(configs, iter_epoch, epoch, images, targets,writer):
     images = list(image.to(configs.device) for image in images)
 
     targets = [{k: v.to(configs.device) for k, v in t.items()} for t in targets]
