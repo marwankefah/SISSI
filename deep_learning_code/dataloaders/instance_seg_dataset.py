@@ -47,7 +47,6 @@ class chrisi_dataset(torch.utils.data.Dataset):
             self.bboxes_path_or_cache += bboxes_path_or_cache
 
         self.sample_list = list(zip(self.img_list, self.bboxes_path_or_cache))
-        self.img_orig_size = np.zeros((len(self.img_list),2))
 
     def __getitem__(self, idx):
         # load images and masks
@@ -66,8 +65,6 @@ class chrisi_dataset(torch.utils.data.Dataset):
 
         img = cv2.imread(img_path, cv2.IMREAD_COLOR)
         # TODO abstract and find another solution
-        if self.img_orig_size[idx].any() != 0:
-            self.img_orig_size[idx] = (img.shape[0], img.shape[1])
 
         boxes_post_process = []
         for box in boxes:
@@ -84,7 +81,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
         boxes = boxes_post_process
         labels = [1] * len(boxes)
         target = {}
-
+        target['image_size'] = torch.as_tensor([img.shape[0], img.shape[1]], dtype=torch.int64)
         if self.transforms is not None:
             img_np = np.array(img)
             if not img_np.dtype == np.uint8:

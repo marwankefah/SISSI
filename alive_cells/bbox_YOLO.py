@@ -20,7 +20,7 @@ mask_path = Path(
     "../data/chrisi/weak_labels/alive/")
 
 output_path = Path(
-    "../data/weak_labels_reduced_nms/alive")
+    "../data/chrisi/weak_labels_reduced_nms/alive")
 dict_sum_counts = {}
 for img, img_name in dead_images_raw:
     mask = np.asarray(Image.open(os.path.join(mask_path, img_name.replace('.jpg', '_mask.png'))))
@@ -80,15 +80,15 @@ for img, img_name in dead_images_raw:
         cv2.rectangle(img, (xmin, ymin),
                       (xmax, ymax), (255, 0, 0), 1)
 
-    boxes = pd.DataFrame(bboxes_post_nms)
+    boxes = pd.DataFrame(bboxes_post_nms, columns=["x_min", "y_min", "x_max", "y_max"])
     boxes['cell_name'] = 'alive'
 
     filename = img_name.split(".")[0]
-    # bboxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
-    #     str(output_path / Path(f"{filename}.txt")), sep=' ', header=None, index=None)
+    boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
+        str(output_path / Path(f"{filename}.txt")), sep=' ', header=None, index=None)
 
-    # plt.imshow(img)
-    # plt.show()
+    plt.imshow(img)
+    plt.show()
 
 plt.bar(dict_sum_counts.keys(), dict_sum_counts.values(), color='g')
 plt.show()

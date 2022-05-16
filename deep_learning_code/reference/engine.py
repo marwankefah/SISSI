@@ -147,9 +147,10 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20):
                                       configs.train_mask)
             logging.info('Evaluation [{}/{}] '.format(iter_per_epoch, total_iter_per_epoch))
 
+        for o, t in zip(outputs, targets1):
+            o.update({'image_size': t['image_size']})
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
-
 
         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
 
@@ -192,13 +193,13 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20):
                                                         val_losses_reduced) + "\t".join(loss_str))
 
     torch.set_num_threads(n_threads)
-    return coco_evaluator.coco_eval['bbox'].stats[1],outputs_list_dict
+    return coco_evaluator.coco_eval['bbox'].stats[1], outputs_list_dict
 
 
 def test(configs, epoch, data_loader, device, writer):
-    n_threads = torch.get_num_threads()
+    # n_threads = torch.get_num_threads()
     # FIXME (i need someone to fix me ) remove this and make paste_masks_in_image run on the GPU
-    torch.set_num_threads(1)
+    # torch.set_num_threads(1)
     configs.model.eval()
     header = 'Testing: Epoch [{}]'.format(epoch)
     logging.info('Testing with no annotations')
@@ -217,7 +218,7 @@ def test(configs, epoch, data_loader, device, writer):
             output_vis_to_tensorboard(images, targets1, outputs, (epoch + 1) * iter_per_epoch, writer,
                                       configs.train_mask)
 
-    torch.set_num_threads(n_threads)
+    # torch.set_num_threads(n_threads)
 
     logging.info('{}  finished [{}/{}]'.format(header, iter_per_epoch, total_iter_per_epoch))
     return

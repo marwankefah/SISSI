@@ -246,12 +246,12 @@ class Configs:
         if train:
             transforms = A.Compose([
                 A.Resize(self.patch_size[0], self.patch_size[1]),
-                A.ChannelShuffle(),
-                A.Blur(),
+                # A.ChannelShuffle(),
+                # A.Blur(),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 # TODO scale parameter tuning (no zoom out just zoom in)
-                A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1, border_mode=0, value=0, mask_value=0),
+                # A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1, border_mode=0, value=0, mask_value=0),
                 ToTensorV2(),
             ]
                 , bbox_params={'format': 'pascal_voc', 'min_area': 0, 'min_visibility': 0,
