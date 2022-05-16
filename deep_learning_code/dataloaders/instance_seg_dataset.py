@@ -152,6 +152,8 @@ class cell_pose_dataset(torch.utils.data.Dataset):
         mask = np.array(mask, np.int16)
         # mask = np.array(mask)
         target = {}
+        target['image_size'] = torch.as_tensor([img.shape[0], img.shape[1]], dtype=torch.int64)
+
         if self.transforms is not None:
             img_np = np.array(img)
             if not img_np.dtype == np.uint8:

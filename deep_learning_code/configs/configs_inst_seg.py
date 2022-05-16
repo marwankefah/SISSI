@@ -91,7 +91,12 @@ class Configs:
 
         self.train_mask = config_file.getboolean(
             'network', 'train_mask', fallback=False)
-
+        self.box_detections_per_img = config_file.getint(
+            'network', 'box_detections_per_img', fallback=250)
+        self.min_size = config_file.getint(
+            'network', 'min_size', fallback=400)
+        self.max_size = config_file.getint(
+            'network', 'max_size', fallback=800)
         self.optim = config_file.get('network', 'optim', fallback='adam')
 
         self.lr_step_size = config_file.getfloat(
@@ -204,7 +209,11 @@ class Configs:
 
     def create_mask_rcnn(self, num_classes):
 
-        model = maskrcnn_resnet50_fpn(pretrained_backbone=True, min_size=400, max_size=800, box_detections_per_img=250)
+        model = maskrcnn_resnet50_fpn(pretrained_backbone=True, rpn_positive_fraction=0.5
+                                      , rpn_fg_iou_thresh=0.7
+                                      , rpn_bg_iou_thresh=0.3
+                                      , box_nms_thresh=0.3, min_size=self.min_size, max_size=self.max_size,
+                                      box_detections_per_img=self.box_detections_per_img)
 
         # get number of input features for the classifier
         in_features = model.roi_heads.box_predictor.cls_score.in_features
@@ -231,7 +240,8 @@ class Configs:
                 A.Blur(),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
-                A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1, border_mode=0, value=0, mask_value=0),
+                A.ShiftScaleRotate(p=0.5, shift_limit=0.2, scale_limit=[0.5, 1.5], border_mode=0, value=0,
+                                   mask_value=0),
                 ToTensorV2(),
             ])
             #  ,bbox_params={'format':'pascal_voc', 'min_area': 0, 'min_visibility': 0, 'label_fields': ['category_id']} )
@@ -251,7 +261,8 @@ class Configs:
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 # TODO scale parameter tuning (no zoom out just zoom in)
-                # A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1, border_mode=0, value=0, mask_value=0),
+                A.ShiftScaleRotate(p=0.5, shift_limit=0.2, scale_limit=[0.5, 1.5], border_mode=0, value=0,
+                                   mask_value=0),
                 ToTensorV2(),
             ]
                 , bbox_params={'format': 'pascal_voc', 'min_area': 0, 'min_visibility': 0,

@@ -32,11 +32,14 @@ from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset
 import reference.utils as utils
 from reference.engine import train_one_epoch, evaluate, test
 
+from deep_learning_code.reference.engine import save_check_point
+
 
 def train(configs, snapshot_path):
     configs.train_writer = SummaryWriter(snapshot_path + '/log')
     configs.val_writer = SummaryWriter(snapshot_path + '/log_val')
     configs.alive_writer = SummaryWriter(snapshot_path + '/log_alive')
+    configs.dead_writer = SummaryWriter(snapshot_path + '/log_dead')
     configs.chrisi_test_writer = SummaryWriter(snapshot_path + '/log_chrisi_test')
 
     configs.model.to(configs.device)
@@ -44,6 +47,8 @@ def train(configs, snapshot_path):
     db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
     db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms)
+    db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, ['dead'], configs.val_detections_transforms)
+
     db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'], configs.val_detections_transforms)
 
     chrisi_test_data_loader = torch.utils.data.DataLoader(
@@ -53,7 +58,9 @@ def train(configs, snapshot_path):
     alive_data_loader = torch.utils.data.DataLoader(
         db_chrisi_alive, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
-
+    dead_data_loader = torch.utils.data.DataLoader(
+        db_chrisi_dead, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
+        collate_fn=utils.collate_fn)
     # score_thresh
     # nms_thresh
     # detections_per_img
@@ -99,26 +106,20 @@ def train(configs, snapshot_path):
         configs.lr_scheduler.step()
         AP_50_all = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
+        evaluate(configs, epoch_num, alive_data_loader, configs.device,
+                 configs.alive_writer,
+                 vis_every_iter=20)
+
+        evaluate(configs, epoch_num, dead_data_loader, configs.device,
+                 configs.dead_writer,
+                 vis_every_iter=20)
+
         #evaluate chrisi testset
         evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
                  vis_every_iter=1)  # AP iou 0.75--all bbox
 
-        # test(configs, epoch_num, alive_data_loader, configs.device, configs.alive_writer)  # AP iou 0.75--all bbox
-        #TODO save each epoch?
-        if AP_50_all > best_AP_50_all:
-            best_AP_50_all = AP_50_all
-            save_mode_path = os.path.join(snapshot_path,
-                                          'epoch_{}_val_AP_50_all_{}.pth'.format(
-                                              epoch_num, round(best_AP_50_all, 4)))
-            logging.info('saving model with best performance {}'.format(best_AP_50_all))
-            utils.save_on_master({
-                'model': configs.model.state_dict(),
-                'optimizer': configs.optimizer.state_dict(),
-                'lr_scheduler': configs.lr_scheduler.state_dict(),
-                'epoch': epoch_num,
-                'best_performance': AP_50_all,
-                'train_iou_values': configs.train_iou_values,
-                'need_label_correction': configs.need_label_correction}, save_mode_path)
+        save_check_point(configs, epoch_num, AP_50_all, snapshot_path)
+
 
         if iter_num >= configs.max_iterations:
             break
