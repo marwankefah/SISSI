@@ -102,7 +102,7 @@ def train(configs, snapshot_path):
     for epoch_num in iterator:
 
         train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
-        configs.lr_scheduler.step()
+
         AP_50_all, _ = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
         evaluate(configs, epoch_num, alive_data_loader, configs.device,

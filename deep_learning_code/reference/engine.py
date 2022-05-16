@@ -23,6 +23,54 @@ category_ids = [1]
 # to visualize the class label for the bounding box on the image
 category_id_to_name = {1: 'cell'}
 
+def train_mixed_one_epoch(configs,data_loader_labeled,data_loader_weak,epoch,print_freq,writer):
+    configs.model.train()
+
+    header = 'Epoch: [{}]'.format(epoch)
+    train_loss_dict = {'loss_classifier': 0, 'loss_box_reg': 0, 'loss_mask': 0, 'loss_objectness': 0,
+                       'loss_rpn_box_reg': 0}
+    total_iter_per_epoch = len(data_loader_weak)
+    labeled_data_loader_iter = iter(data_loader_labeled)
+    weak_labeled_data_loader_iter = iter(data_loader_weak)
+
+    for i_batch in range(0, total_iter_per_epoch):
+        sampled_labelled_batch = labeled_data_loader_iter.next()
+        sampled_weak_labelled_batch = weak_labeled_data_loader_iter.next()
+        # images, targets, cell_names = images
+
+        input = torch.cat((sampled_labelled_batch[0],sampled_weak_labelled_batch[0] ), 0)
+        label = torch.cat((sampled_labelled_batch[1],sampled_weak_labelled_batch[1] ), 0)
+
+        loss_dict_reduced, loss_value = train_one_iter(configs, i_batch, epoch, input, label)
+
+
+        writer.add_scalar('info/lr', configs.optimizer.param_groups[0]["lr"], epoch)
+
+        train_loss_dict = Counter(train_loss_dict) + Counter(loss_dict_reduced)
+
+        loss_str = []
+        for name, meter in loss_dict_reduced.items():
+            loss_str.append(
+                "{}: {}".format(name, str(round(float(meter), 5)))
+            )
+
+        logging.info('{} [{}/{}] loss:{} '.format(header, i_batch, total_iter_per_epoch,
+                                                  round(loss_value, 4)) + "\t".join(loss_str))
+
+    train_losses_reduced = sum(loss for loss in train_loss_dict.values()) / total_iter_per_epoch
+    loss_str = []
+    for name, meter in train_loss_dict.items():
+        writer.add_scalar('info/' + str(name), float(meter) / total_iter_per_epoch, epoch)
+        loss_str.append(
+            "{}: {}".format(name, str(round(float(meter) / total_iter_per_epoch, 5)))
+        )
+
+    writer.add_scalar('info/total_loss', train_losses_reduced, epoch)
+
+    logging.info('{}  finished [{}/{}] lr: {} loss:{} '.format(header, i_batch, total_iter_per_epoch,
+                                                               configs.optimizer.param_groups[0]["lr"],
+                                                               train_losses_reduced) + "\t".join(loss_str))
+
 
 def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
     configs.model.train()
@@ -40,41 +88,12 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
     total_iter_per_epoch = len(data_loader)
 
     for iter_epoch, (images, targets, cell_names) in enumerate(data_loader):
-        images = list(image.to(configs.device) for image in images)
 
-        targets = [{k: v.to(configs.device) for k, v in t.items()} for t in targets]
-
-        loss_dict, outputs = configs.model(images, targets)
-
-        losses = sum(loss for loss in loss_dict.values())
-
-        # reduce losses over all GPUs for logging purposes
-        loss_dict_reduced = utils.reduce_dict(loss_dict)
-
-        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-
-        loss_value = losses_reduced.item()
-
-        if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value))
-            print(loss_dict_reduced)
-            sys.exit(1)
-
-        configs.optimizer.zero_grad()
-        losses.backward()
-        configs.optimizer.step()
+        loss_dict_reduced, loss_value = train_one_iter(configs, iter_epoch, epoch, images, targets)
 
         if lr_scheduler is not None:
             lr_scheduler.step()
-
         writer.add_scalar('info/lr', configs.optimizer.param_groups[0]["lr"], epoch)
-
-        # TODO check it make the functionality required
-        # outputs_list_dict.append({target["image_id"].item(): output for target, output in zip(targets, outputs)})
-
-        if iter_epoch % 20 == 0:
-            # (epoch+1)*iter_epoch
-            output_vis_to_tensorboard(images, targets, outputs, (epoch + 1) * iter_epoch, writer, configs.train_mask)
 
         train_loss_dict = Counter(train_loss_dict) + Counter(loss_dict_reduced)
 
@@ -86,6 +105,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
 
         logging.info('{} [{}/{}] loss:{} '.format(header, iter_epoch, total_iter_per_epoch,
                                                   round(loss_value, 4)) + "\t".join(loss_str))
+
 
     train_losses_reduced = sum(loss for loss in train_loss_dict.values()) / total_iter_per_epoch
     loss_str = []
@@ -102,6 +122,40 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
                                                                train_losses_reduced) + "\t".join(loss_str))
 
     return
+
+
+def train_one_iter(configs, iter_epoch, epoch, images, targets):
+    images = list(image.to(configs.device) for image in images)
+
+    targets = [{k: v.to(configs.device) for k, v in t.items()} for t in targets]
+
+    loss_dict, outputs = configs.model(images, targets)
+
+    losses = sum(loss for loss in loss_dict.values())
+
+    # reduce losses over all GPUs for logging purposes
+    loss_dict_reduced = utils.reduce_dict(loss_dict)
+
+    losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+
+    loss_value = losses_reduced.item()
+
+    if not math.isfinite(loss_value):
+        print("Loss is {}, stopping training".format(loss_value))
+        print(loss_dict_reduced)
+        sys.exit(1)
+
+    configs.optimizer.zero_grad()
+    losses.backward()
+    configs.optimizer.step()
+
+    # TODO check it make the functionality required
+    # outputs_list_dict.append({target["image_id"].item(): output for target, output in zip(targets, outputs)})
+
+    if iter_epoch % 20 == 0:
+        # (epoch+1)*iter_epoch
+        output_vis_to_tensorboard(images, targets, outputs, (epoch + 1) * iter_epoch, writer, configs.train_mask)
+    return loss_dict_reduced, loss_value
 
 
 def _get_iou_types(model, has_mask):
