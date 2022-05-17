@@ -174,7 +174,7 @@ def train(configs, snapshot_path):
         train_mixed_one_epoch(configs, cell_pose_train_dataloader, weak_label_chrisi_dataloader, epoch_num, 20, configs.train_writer)
 
 
-        configs.lr_scheduler.step(train_iou)
+        configs.lr_scheduler.step(AP_50_all)
 
         # configs.train_iou_values.append(train_iou)
 

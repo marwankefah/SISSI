@@ -160,7 +160,7 @@ def train(configs, snapshot_path):
 
         configs.lr_scheduler.step(train_iou)
 
-        configs.train_iou_values.append(train_iou)
+        configs.train_iou_values.append(AP_50_all)
 
         if iter_num >= configs.max_iterations:
             break
