@@ -106,6 +106,8 @@ class Configs:
             'network', 'lr_gamma', fallback=0.1)
         self.label_correction = config_file.getboolean(
             'network', 'label_correction', fallback=False)
+        self.need_label_correction = config_file.getboolean(
+            'network', 'need_label_correction', fallback=False)
 
         self.label_correction_threshold = config_file.getfloat(
             'network', 'label_correction_threshold', fallback=0.9)
@@ -170,7 +172,6 @@ class Configs:
 
         # self.lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[1, 10],
         #                                                          gamma=0.1)
-        self.need_label_correction = False
         self.train_iou_values = []
 
         # self.lr_scheduler = torch.optim.lr_scheduler.StepLR(
