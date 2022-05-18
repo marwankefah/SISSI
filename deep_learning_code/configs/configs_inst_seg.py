@@ -106,8 +106,6 @@ class Configs:
             'network', 'lr_gamma', fallback=0.1)
         self.label_correction = config_file.getboolean(
             'network', 'label_correction', fallback=False)
-        self.need_label_correction = config_file.getboolean(
-            'network', 'need_label_correction', fallback=False)
 
         self.label_correction_threshold = config_file.getfloat(
             'network', 'label_correction_threshold', fallback=0.9)
@@ -202,6 +200,10 @@ class Configs:
             self.best_performance = checkpoint['best_performance']
             self.train_iou_values = checkpoint['train_iou_values']
             self.need_label_correction = checkpoint['need_label_correction']
+
+        self.need_label_correction = config_file.getboolean(
+            'network', 'need_label_correction', fallback=False)
+
 
     def update_lr(self, iter_num):
         if self.optim.lower() == 'sgd':

@@ -380,7 +380,7 @@ from torchvision.ops import boxes as box_ops
 
 
 def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_num, max_epoch):
-    if configs.label_correction or len(configs.train_iou_values) != 0:
+    if configs.label_correction:
         # if the flag is false, then check every time if it needs label correction
         # if it is true one time, it will always be true
         if not configs.need_label_correction:
