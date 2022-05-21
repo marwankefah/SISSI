@@ -21,8 +21,10 @@ data_dir = Path(
     "../data/chrisi/" + cell_type + "/"
 )
 dead_images_raw = [
-    [cv2.imread(str(img)), str(img).split('\\')[-1]] for img in data_dir.iterdir()
-]
+    [cv2.imread(str(img)), str(img).split('\\')[-1]] for img in data_dir.iterdir()]
+
+output_path = Path("../data/chrisi/weak_labels_reduced_nms/inhib")
+
 dead_images_raw.remove([None, '.gitignore'])
 dict_sum_counts = {}
 
@@ -59,7 +61,7 @@ for image, img_name in dead_images_raw:
         minr, minc, maxr, maxc = props.bbox
         area = (maxc - minc) * (maxr - minr)
         dict_sum_counts[area] = dict_sum_counts.get(area, 0) + 1
-        is_large_or_small = not (props.area_bbox < 400)
+        is_large_or_small = not (props.area_bbox < 400 or props.area_bbox > 8000)
         if is_large_or_small and minc < maxc and minr < maxr:
             boxes.append([minc, minr, maxc, maxr])
             boxeslist["cell_name"].append("inhib")
@@ -86,6 +88,10 @@ for image, img_name in dead_images_raw:
 
     boxes = pd.DataFrame(bboxes_post_nms, columns=["x_min", "y_min", "x_max", "y_max"])
     boxes['cell_name'] = 'inhib'
+
+    filename = img_name.split(".")[0]
+    boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
+        str(output_path / Path(f"{filename}.txt")), sep=' ', header=None, index=None)
 
     plt.imshow(image)
     plt.show()
