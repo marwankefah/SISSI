@@ -7,6 +7,7 @@ from torchvision import datasets, transforms
 import feature.Ada as Ada
 from torch import nn
 import pandas as pd
+from pathlib import Path
 # %%
 
 
@@ -80,44 +81,62 @@ def gaborvector(images, real, imag, device="cpu"):
     return images
 
 
+def loadcifar(path, transforms=[], batchsize=4096):
+    data = datasets.CIFAR10(
+        path, train=True, transform=transforms, download=True)
+    trainloader = torch.utils.data.DataLoader(
+        data, batch_size=batchsize, shuffle=True)
+    return trainloader
+
+
 train_transforms = transforms.Compose([transforms.Resize(22),
                                        transforms.CenterCrop(22),
                                        transforms.Grayscale(),
                                        transforms.ToTensor()])
 
+cropped_data_path = Path("data/cropped")
+dead_path = cropped_data_path/Path("dead")
+alive_path = cropped_data_path/Path("alive")
+inhib_path = cropped_data_path/Path("inhib")
+cifar_path = Path("data/cifar")
 
-dead_path = "/Users/manasikattel/cell-segmentation/raw/named_images_type/dead"
-alive_path = "/Users/manasikattel/cell-segmentation/raw/named_images_type/alive"
 
+dead_trainloader = loadData(str(dead_path), train_transforms, batchsize=5000)
+alive_trainloader = loadData(str(alive_path), train_transforms, batchsize=5000)
+inhib_trainloader = loadData(str(inhib_path), train_transforms, batchsize=5000)
+cifarloader = loadcifar(str(cifar_path), train_transforms, batchsize=15000)
 
-dead_trainloader = loadData(dead_path, train_transforms, batchsize=70)
-alive_trainloader = loadData(alive_path, train_transforms, batchsize=94)
 
 deaditer = iter(dead_trainloader)
-images, labels = deaditer.next()
-
 aliveiter = iter(alive_trainloader)
-images2, labels2 = aliveiter.next()
+inhibiter = iter(inhib_trainloader)
+cifariter = iter(cifarloader)
 
+images_dead, labels_dead = deaditer.next()
+images_alive, labels_alive = aliveiter.next()
+images_inhib, labels_inhib = inhibiter.next()
+images_cifar, labels_cifar = cifariter.next()
 
-X1 = torch.concat((images[0:46], images2[0:62])).reshape(-1, 22, 22)
-Y1 = np.ones((108, 1))
-Y1[46::] = 0
+X1 = torch.concat((images_dead[0:4000], images_alive[0:4000],
+                  images_inhib[0:4000], images_cifar[0:12000])).reshape(-1, 22, 22)
+Y1 = np.ones((24000, 1))
+Y1[12000::] = 0
 X1 = X1.unsqueeze(1)
 
-X2 = torch.concat((images[46::], images2[62::])).reshape(-1, 22, 22)
-Y2 = np.ones((56, 1))
-Y2[24::] = 0
+X2 = torch.concat((images_dead[4000::], images_alive[4000::],
+                  images_inhib[4000::], images_cifar[12000::])).reshape(-1, 22, 22)
+Y2 = np.ones((6000, 1))
+Y2[3000::] = 0
 X2 = X2.unsqueeze(1)
 
 
 real, imag = build_filters()
 
-
 X_feat1 = gaborvector(X1, real, imag)
 X_feat2 = gaborvector(X2, real, imag)
 
-ada = Ada.AdaBoostSelection(150)
+ada = Ada.AdaBoostSelection(200)
+
 ada.fit(X_feat1.numpy(), Y1)
 
 acctrain = ada.validate(X_feat1.numpy(), Y1)

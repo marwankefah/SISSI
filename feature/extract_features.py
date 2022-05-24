@@ -50,20 +50,21 @@ def extract_features(save=True):
     all_cells_raw = get_all_cells(
         Path("/Users/manasikattel/cell-segmentation/raw/deadplusalive"),
         Path("/Users/manasikattel/cell-segmentation/data/output/bbox"))
-    [cv2.imwrite("/Users/manasikattel/cell-segmentation/data/cropped/"+f"{cell[0]}_{cell[1]}_{cell[2]}.png", cell[3])
+    [cv2.imwrite(f"/Users/manasikattel/cell-segmentation/data/cropped/{cell[2]}/{cell[2]}/"+f"{cell[0]}_{cell[1]}_{cell[2]}.png", cell[3])
      for cell in all_cells_raw]
     breakpoint()
     feature_dfs = []
     print("Extracting features")
     for (cell_name, index, cell_type, img) in tqdm(all_cells_raw):
-        plt.imshow(img)
-        plt.title(cell_type + str(", ") + cell_name +
-                  str(", Cell no.: ") + str(index))
-        plt.show()
+        if "inhib" in cell_type:
+            plt.imshow(img)
+            plt.title(cell_type + str(", ") + cell_name +
+                      str(", Cell no.: ") + str(index))
+            plt.show()
         gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # glcm_features_dict = glcm_features(gray_img)
-        # feature_df = pd.DataFrame(glcm_features_dict)
+        glcm_features_dict = glcm_features(gray_img)
+        feature_df = pd.DataFrame(glcm_features_dict)
 
         feature_df["cell_name"] = cell_name
         feature_df["cell_no"] = index

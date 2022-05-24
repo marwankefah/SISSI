@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 
 
 class Classifier:
@@ -39,7 +40,7 @@ class AdaBoostSelection:
         # TODO check if threshold depends on weight
 
         Y = Y.reshape(Y.shape[0])
-        for i in range(self.T):
+        for i in tqdm(range(self.T)):
             # TODO change thresholding in the future to parity !!!
             classifier = Classifier()
             threshpos = np.sum(w[Y == 1] * X[Y == 1],
