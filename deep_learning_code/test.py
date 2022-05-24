@@ -1,28 +1,65 @@
-from configs.configs_mean_teacher import Configs
-from dataloaders.dataset import (ddsm_dataset_labelled,BaseFetaDataSets, RandomGenerator, ResizeTransform, TwoStreamBatchSampler)
+import time
+
+from configs.configs_inst_seg import Configs
+from dataloaders.dataset import (ddsm_dataset_labelled, BaseFetaDataSets, RandomGenerator, ResizeTransform,
+                                 TwoStreamBatchSampler)
 from medpy import metric
 from monai.data.utils import decollate_batch
+from odach_our import oda
 from torch.utils.data import DataLoader
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import random
 from PIL import Image
+from reference.engine import train_one_epoch, evaluate, test, save_check_point
+from dataloaders.instance_seg_dataset import chrisi_dataset
+import os
+from tensorboardX import SummaryWriter
+import reference.utils as utils
 
-configs = Configs('./configs/mean_teacher.ini')
-# db_test = BaseFetaDataSets(configs=configs, split='test', transform=configs.val_transform)
-db_test = ddsm_dataset_labelled(configs=configs, split='train', transform=configs.val_transform)
+from dataloaders.instance_seg_dataset import cell_pose_dataset
 
-valloader = DataLoader(db_test, batch_size=1, shuffle=False)
+from reference.engine import test_time_augmentation
 
-medpy_dice_sum_foreground = 0
-medpy_dice_sum_background = 0
+configs = Configs('./configs/mask_rcnn_test.ini')
+log_time = int(time.time())
 
-val_loss_list = []
+snapshot_path = os.path.join(configs.model_path.split('.pth')[0], str(log_time), 'test')
+
+if not os.path.exists(snapshot_path):
+    os.makedirs(snapshot_path)
+
+# configs.train_writer = SummaryWriter(snapshot_path + '/log')
+# configs.val_writer = SummaryWriter(snapshot_path + '/log_val')
+configs.alive_writer = SummaryWriter(snapshot_path + '/log_alive')
+configs.dead_writer = SummaryWriter(snapshot_path + '/log_dead')
+configs.chrisi_test_writer = SummaryWriter(snapshot_path + '/log_chrisi_test')
+
+db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
+                                configs.val_detections_transforms)
+
+db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
+db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
+db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms)
+db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, ['dead'], configs.val_detections_transforms)
+
+chrisi_test_data_loader = torch.utils.data.DataLoader(
+    db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
+    collate_fn=utils.collate_fn)
+
+db_chrisi_alive.sample_list = random.sample(db_chrisi_alive.sample_list, 20)
+db_chrisi_dead.sample_list = random.sample(db_chrisi_dead.sample_list, 20)
+
+alive_data_loader = torch.utils.data.DataLoader(
+    db_chrisi_alive, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
+    collate_fn=utils.collate_fn)
+dead_data_loader = torch.utils.data.DataLoader(
+    db_chrisi_dead, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
+    collate_fn=utils.collate_fn)
 
 configs.model.to(configs.device)
 
-configs.model.eval()
 if not configs.deterministic:
     cudnn.benchmark = True
     cudnn.deterministic = False
@@ -35,44 +72,25 @@ np.random.seed(configs.seed)
 torch.manual_seed(configs.seed)
 torch.cuda.manual_seed(configs.seed)
 
-medpy_dice_list=[]
+medpy_dice_list = []
+
+tta = [oda.HorizontalFlip(), oda.VerticalFlip()]
+scale = [0.8, 0.9, 1, 1.1, 1.2]
+
+# wrap model and tta
+tta_model = oda.TTAWrapper(configs.model, tta, scale, nms="wbf", iou_thr=0.5, skip_box_thr=0.25, score_thresh=0.25)
+
 with torch.no_grad():
-    for i_batch, sampled_batch in enumerate(valloader):
-        val_images, val_labels = sampled_batch["image"].to(configs.device), sampled_batch["label"].to(
-            configs.device)
+    test_time_augmentation(configs, tta_model, alive_data_loader, configs.device,
+                           writer=configs.alive_writer)
 
-        val_outputs, val_classification_output = configs.model(val_images)
+    test_time_augmentation(configs, tta_model, chrisi_test_data_loader, configs.device,
+                           writer=configs.chrisi_test_writer)
 
-        val_dice_loss = configs.criterion(val_outputs, val_labels.long())
+    test_time_augmentation(configs, tta_model, dead_data_loader, configs.device,
+                           writer=configs.dead_writer)
 
-        val_ce_loss = configs.criterion_1(val_outputs, val_labels.squeeze(1).long())
-
-        val_loss = 0.5 * (val_ce_loss + val_dice_loss)
-        val_loss_list.append(val_loss.detach().cpu().numpy())
-
-        y_onehot = [configs.y_trans(i) for i in decollate_batch(val_labels)]
-        y_pred_act = [configs.y_pred_trans(i) for i in decollate_batch(val_outputs)]
-
-        configs.dice_metric(y_pred_act, y_onehot)
-        medpy_dice_foreground = metric.binary.dc(y_pred_act[0][1].detach().cpu().numpy(),
-                                      val_labels.squeeze().detach().cpu().numpy() > 0.5)
-        medpy_dice_background = metric.binary.dc(y_pred_act[0][0].detach().cpu().numpy(),
-                                                 val_labels.squeeze().detach().cpu().numpy() < 0.5)
-
-        medpy_dice_list.append(medpy_dice_foreground)
-        medpy_dice_sum_foreground += medpy_dice_foreground
-        medpy_dice_sum_background +=medpy_dice_background
-
-medpy_dice_sum_foreground = medpy_dice_sum_foreground / len(valloader)
-medpy_dice_sum_background = medpy_dice_sum_background / len(valloader)
-
-val_dice_metric = configs.dice_metric.aggregate().item()
-
-print(np.mean(medpy_dice_list),np.std(medpy_dice_list),val_dice_metric)
-print('background class dice: {} foreground class dice: {}, {},{}'.format(medpy_dice_sum_background,medpy_dice_sum_foreground,np.mean(medpy_dice_list), val_dice_metric))
-
-configs.dice_metric.reset()
-
-val_loss_mean = np.mean(val_loss_list, axis=0)
-
-print('dataset loss ', val_loss_mean,' dice score_medpy background:' , medpy_dice_sum_background ,'dice score_medpy foreground: ', medpy_dice_sum_foreground, ' dice score monai', val_dice_metric)
+    # evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
+    #          vis_every_iter=1)
+    # evaluate(configs, 0, alive_data_loader, device=configs.device, writer=configs.alive_writer, vis_every_iter=5)
+    # evaluate(configs, 0, dead_data_loader, device=configs.device, writer=configs.dead_writer, vis_every_iter=5)

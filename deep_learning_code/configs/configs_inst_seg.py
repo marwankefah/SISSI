@@ -80,7 +80,6 @@ class Configs:
         self.linux = config_file.getboolean('path', 'linux', fallback=False)
         self.model_path = config_file.get('path', 'model_path', fallback='')
         self.fold = config_file.getint('path', 'fold', fallback=0)
-
         self.load_model = config_file.getint('path', 'load_model', fallback=1)
 
         self.exp = config_file.get('path', 'exp', fallback='FETA/Mean_Teacher')
@@ -99,6 +98,8 @@ class Configs:
         self.max_size = config_file.getint(
             'network', 'max_size', fallback=800)
         self.optim = config_file.get('network', 'optim', fallback='adam')
+        self.box_score_thresh =config_file.getfloat('network', 'box_score_thresh', fallback=0.05)
+        self.box_nms_thresh =config_file.getfloat('network', 'box_nms_thresh', fallback=0.3)
 
         self.lr_step_size = config_file.getfloat(
             'network', 'lr_step_size', fallback=8)
@@ -216,7 +217,7 @@ class Configs:
         model = maskrcnn_resnet50_fpn(pretrained_backbone=True, rpn_positive_fraction=0.5
                                       , rpn_fg_iou_thresh=0.7
                                       , rpn_bg_iou_thresh=0.3
-                                      , box_nms_thresh=0.3, min_size=self.min_size, max_size=self.max_size,
+                                      , box_nms_thresh=self.box_nms_thresh,box_score_thresh=self.box_score_thresh, min_size=self.min_size, max_size=self.max_size,
                                       box_detections_per_img=self.box_detections_per_img)
 
         # get number of input features for the classifier
@@ -260,8 +261,8 @@ class Configs:
         if train:
             transforms = A.Compose([
                 A.Resize(self.patch_size[0], self.patch_size[1]),
-                # A.ChannelShuffle(),
-                # A.Blur(),
+                A.ChannelShuffle(),
+                A.Blur(),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 # TODO scale parameter tuning (no zoom out just zoom in)

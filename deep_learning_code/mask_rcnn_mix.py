@@ -144,17 +144,25 @@ def train(configs, snapshot_path):
 
     for epoch_num in iterator:
 
+
         train_iou, outputs_list_dict = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
                                                 configs.val_writer,
                                                 vis_every_iter=20)
 
+        #TODO to TTA
         evaluate(configs, epoch_num, chrisi_alive_data_loader, configs.device,
                  configs.alive_writer,
                  vis_every_iter=5)
 
+        #TODO to TTA
         evaluate(configs, epoch_num, chrisi_dead_data_loader, configs.device,
                  configs.dead_writer,
                  vis_every_iter=5)
+        #TODO add to TTA to test
+
+
+        #TODO add TTA to training and use its output_list
+
 
         evaluate(configs, epoch_num, cell_pose_test_dataloader, device=configs.device, writer=configs.cell_pose_test_writer)
 
@@ -163,6 +171,7 @@ def train(configs, snapshot_path):
                                 vis_every_iter=1)
 
         save_check_point(configs, epoch_num, AP_50_all, snapshot_path)
+
 
         correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_num, max_epoch)
 

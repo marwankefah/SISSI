@@ -1,6 +1,7 @@
 import math
 import sys
 import time
+import random
 from typing import Tuple, List, Dict, Optional
 import torch
 from torch import Tensor
@@ -39,10 +40,10 @@ def train_mixed_one_epoch(configs, data_loader_labeled, data_loader_weak, epoch,
         sampled_weak_labelled_batch = weak_labeled_data_loader_iter.next()
         # images, targets, cell_names = images
 
-        input = sampled_labelled_batch[0]+sampled_weak_labelled_batch[0]
-        label = sampled_labelled_batch[1]+sampled_weak_labelled_batch[1]
+        input = sampled_labelled_batch[0] + sampled_weak_labelled_batch[0]
+        label = sampled_labelled_batch[1] + sampled_weak_labelled_batch[1]
 
-        loss_dict_reduced, loss_value = train_one_iter(configs, i_batch, epoch, input, label,writer)
+        loss_dict_reduced, loss_value = train_one_iter(configs, i_batch, epoch, input, label, writer)
 
         writer.add_scalar('info/lr', configs.optimizer.param_groups[0]["lr"], epoch)
 
@@ -89,7 +90,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
 
     for iter_epoch, (images, targets, cell_names) in enumerate(data_loader):
 
-        loss_dict_reduced, loss_value = train_one_iter(configs, iter_epoch, epoch, images, targets,writer)
+        loss_dict_reduced, loss_value = train_one_iter(configs, iter_epoch, epoch, images, targets, writer)
 
         if lr_scheduler is not None:
             lr_scheduler.step()
@@ -123,7 +124,7 @@ def train_one_epoch(configs, data_loader, epoch, print_freq, writer):
     return
 
 
-def train_one_iter(configs, iter_epoch, epoch, images, targets,writer):
+def train_one_iter(configs, iter_epoch, epoch, images, targets, writer):
     images = list(image.to(configs.device) for image in images)
 
     targets = [{k: v.to(configs.device) for k, v in t.items()} for t in targets]
@@ -277,6 +278,19 @@ def test(configs, epoch, data_loader, device, writer):
     return
 
 
+def test_time_augmentation(configs, tta_model, data_loader, device, writer):
+    # Execute TTA!
+    configs.model.eval()
+    for iter_per_epoch, (images, targets, cell_names) in enumerate(data_loader):
+        targets1 = [{k: v.to(device) for k, v in t.items()} for t in targets]
+        images = list(img.to(device) for img in images)
+
+        outputs = tta_model(torch.stack(images).cuda())
+
+        output_vis_to_tensorboard(images, targets1, outputs, iter_per_epoch, writer,
+                                  configs.train_mask)
+
+
 def visualize_bbox(img, bbox, class_name, color=(150, 0, 0), thickness=1):
     """Visualizes a single bounding box on the image"""
     x_min, y_min, x_max, y_max = bbox
@@ -298,24 +312,28 @@ def visualize_bbox(img, bbox, class_name, color=(150, 0, 0), thickness=1):
     return img
 
 
-def visualize(image, bboxes, category_ids, category_id_to_name):
+def visualize(image, bboxes, scores, category_ids, category_id_to_name):
     img = image.copy()
-    for bbox, category_id in zip(bboxes, category_ids):
+    for bbox, category_id, score in zip(bboxes, category_ids, scores):
         class_name = category_id_to_name[category_id]
-        img = visualize_bbox(img, bbox, class_name)
+        img = visualize_bbox(img, bbox, '{} {:.2f}'.format(class_name, score))
     return img
 
 
 def output_vis_to_tensorboard(images, targets1, outputs, iter_per_epoch, writer, train_mask):
-    img = images[0].detach().cpu().numpy()
+    random_val_visualize_int = random.randint(0, len(images) - 1)
+    img = images[random_val_visualize_int].detach().cpu().numpy()
     writer.add_image('image', img, iter_per_epoch)
-    img_gt_boxes_channel_last = np.moveaxis(images[0].detach().cpu().numpy(), 0, -1)
-    img_with_gt_boxes = visualize(img_gt_boxes_channel_last, targets1[0]['boxes'].detach().cpu().numpy(),
-                                  targets1[0]['labels'].detach().cpu().numpy(), category_id_to_name)
+    img_gt_boxes_channel_last = np.moveaxis(img, 0, -1)
+    img_with_gt_boxes = visualize(img_gt_boxes_channel_last,
+                                  targets1[random_val_visualize_int]['boxes'].detach().cpu().numpy(),
+                                  targets1[random_val_visualize_int]['labels'].detach().cpu().numpy(),
+                                  targets1[random_val_visualize_int]['labels'].detach().cpu().numpy(),
+                                  category_id_to_name)
     img_gt_boxes_channel_first = np.moveaxis(img_with_gt_boxes, -1, 0)
     writer.add_image('image_GT_boxes', img_gt_boxes_channel_first, iter_per_epoch)
     if train_mask:
-        masks_binary = targets1[0]['masks'].detach().cpu().numpy()
+        masks_binary = targets1[random_val_visualize_int]['masks'].detach().cpu().numpy()
         maski = np.zeros(shape=masks_binary[0].shape, dtype=np.uint16)
         for idx, mask in enumerate(masks_binary):
             maski[mask == 1] = idx + 1
@@ -324,12 +342,15 @@ def output_vis_to_tensorboard(images, targets1, outputs, iter_per_epoch, writer,
         img_gt_overlay_channel_first = np.moveaxis(img_gt_overlay, -1, 0)
         writer.add_image('image_GT_masks', img_gt_overlay_channel_first, iter_per_epoch)
     ##################################################################
-    img_with_output_boxes = visualize(img_gt_boxes_channel_last, outputs[0]['boxes'].detach().cpu().numpy(),
-                                      outputs[0]['labels'].detach().cpu().numpy(), category_id_to_name)
+    img_with_output_boxes = visualize(img_gt_boxes_channel_last,
+                                      outputs[random_val_visualize_int]['boxes'].detach().cpu().numpy(),
+                                      outputs[random_val_visualize_int]['scores'].detach().cpu().numpy(),
+                                      outputs[random_val_visualize_int]['labels'].detach().cpu().numpy(),
+                                      category_id_to_name)
     img_gt_output_channel_first = np.moveaxis(img_with_output_boxes, -1, 0)
     writer.add_image('image_output_boxes', img_gt_output_channel_first, iter_per_epoch)
     if train_mask:
-        masks_binary = outputs[0]['masks'].squeeze().detach().cpu().numpy()
+        masks_binary = outputs[random_val_visualize_int]['masks'].squeeze().detach().cpu().numpy()
         maski = np.zeros(shape=masks_binary[0].shape, dtype=np.uint16)
         for idx, mask in enumerate(masks_binary):
             maski[mask > 0.5] = idx + 1
@@ -400,6 +421,7 @@ def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_
                     labels = model_single_output['labels']
                     inds = torch.where(scores > 0.25)[0]
                     boxes, scores, labels = boxes[inds], scores[inds], labels[inds]
+
                     # # remove empty boxes
                     keep = box_ops.remove_small_boxes(boxes, min_size=1e-2)
                     boxes, scores, labels = boxes[keep], scores[keep], labels[keep]

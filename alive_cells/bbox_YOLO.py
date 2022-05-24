@@ -84,8 +84,8 @@ for img, img_name in dead_images_raw:
     boxes['cell_name'] = 'alive'
 
     filename = img_name.split(".")[0]
-    boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
-        str(output_path / Path(f"{filename}.txt")), sep=' ', header=None, index=None)
+    # boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
+    #     str(output_path / Path(f"{filename}.txt")), sep=' ', header=None, index=None)
 
     plt.imshow(img)
     plt.show()
