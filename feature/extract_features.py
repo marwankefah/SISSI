@@ -25,10 +25,9 @@ def crop_w_bboxes(image, bboxes):
 
 
 def get_all_cells(image_dir, bbox_dir):
-
     all_images_raw = [
         [cv2.imread(str(img)), str(img).split("/")[-1]]
-        for img in image_dir.iterdir() if ".jpg" in str(img)
+        for img in image_dir.rglob("*") if ".jpg" in str(img)
     ]
     col_list = ["cell_type", "x_min", "y_min", "x_max", "y_max"]
     cropped_all = []
@@ -48,19 +47,18 @@ def get_all_cells(image_dir, bbox_dir):
 
 def extract_features(save=True):
     all_cells_raw = get_all_cells(
-        Path("/Users/manasikattel/cell-segmentation/raw/deadplusalive"),
-        Path("/Users/manasikattel/cell-segmentation/data/output/bbox"))
-    [cv2.imwrite(f"/Users/manasikattel/cell-segmentation/data/cropped/{cell[2]}/{cell[2]}/"+f"{cell[0]}_{cell[1]}_{cell[2]}.png", cell[3])
+        Path("data/chrisi"),
+        Path("data/output/bbox"))
+    [cv2.imwrite(str(Path("data/cropped") / Path(cell[2]) / Path(cell[2]) / Path(f"{cell[0]}_{cell[1]}_{cell[2]}.png")), cell[3])
      for cell in all_cells_raw]
-    breakpoint()
     feature_dfs = []
     print("Extracting features")
     for (cell_name, index, cell_type, img) in tqdm(all_cells_raw):
-        if "inhib" in cell_type:
-            plt.imshow(img)
-            plt.title(cell_type + str(", ") + cell_name +
-                      str(", Cell no.: ") + str(index))
-            plt.show()
+        # if "inhib" in cell_type:
+        # plt.imshow(img)
+        # plt.title(cell_type + str(", ") + cell_name +
+        #           str(", Cell no.: ") + str(index))
+        # plt.show()
         gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         glcm_features_dict = glcm_features(gray_img)
@@ -72,11 +70,8 @@ def extract_features(save=True):
         feature_dfs.append(feature_df)
 
     features = pd.concat(feature_dfs)
-    features.to_csv(output_dir/Path("features.csv"))
-    # breakpoint()
+    features.to_csv(output_dir/Path("glcm_features.csv"))
 
 
-# %%
-extract_features()
-
-# %%
+if __name__ == "__main__":
+    extract_features()
