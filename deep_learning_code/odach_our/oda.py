@@ -6,6 +6,8 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
+from collections import Counter
+
 
 class Base():
     def augment(self, image):
@@ -247,26 +249,31 @@ class TTAWrapper:
                                                         tta_transform]))
         return tta_transforms
 
-    def model_inference(self, img):
+    def model_inference(self, img, targets):
         with torch.no_grad():
-            results = self.model(img)
+            results = self.model(img, targets)
         return results
 
     def tta_num(self):
         return len(self.ttas)
 
     # TODO: change to call
-    def __call__(self, img):
+    def __call__(self, img, targets):
+        img = torch.stack(img).cuda()
         n = img.size()[0]
         boxes_batch = [[] for x in range(n)]
         scores_batch = [[] for x in range(n)]
         labels_batch = [[] for x in range(n)]
         # TTA loop
+        tta_losses = {'loss_classifier': 0, 'loss_box_reg': 0, 'loss_mask': 0, 'loss_objectness': 0,
+                      'loss_rpn_box_reg': 0}
         for tta in self.ttas:
             # gen img
             inf_img = tta.batch_augment(img.clone())
-            results = self.model_inference(inf_img)[1]
+            loss, results = self.model_inference(inf_img, targets)
             # iter for batch
+            tta_losses = Counter(tta_losses) + Counter(loss)
+
             for idx, result in enumerate(results):
                 box = result["boxes"].cpu().numpy()
                 box = tta.deaugment_boxes(box)
@@ -305,7 +312,9 @@ class TTAWrapper:
 
             outputs.append(output)
 
-        return outputs
+        tta_losses = {k: v / len(self.ttas) for k, v in tta_losses.items()}
+
+        return tta_losses, outputs
 
 
 # for use in EfficientDets

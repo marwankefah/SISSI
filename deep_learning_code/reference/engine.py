@@ -7,6 +7,7 @@ import torch
 from torch import Tensor
 from collections import OrderedDict
 from torchvision.models.detection.roi_heads import fastrcnn_loss
+from odach_our import oda
 from torchvision.models.detection.rpn import concat_box_prediction_layers
 import cv2
 import torch
@@ -169,12 +170,22 @@ def _get_iou_types(model, has_mask):
 
 
 @torch.no_grad()
-def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20):
+def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20, use_tta=False):
     n_threads = torch.get_num_threads()
     # FIXME (i need someone to fix me ) remove this and make paste_masks_in_image run on the GPU
     torch.set_num_threads(1)
     cpu_device = torch.device("cpu")
     configs.model.eval()
+    configs.model.rpn.training = True
+    configs.model.roi_heads.training = True
+
+    if use_tta:
+        tta = [oda.HorizontalFlip(), oda.VerticalFlip()]
+        scale = [0.8, 0.9, 1, 1.1, 1.2]
+        model = oda.TTAWrapper(configs.model, tta, scale, nms="wbf", iou_thr=0.5, skip_box_thr=0.25, score_thresh=configs.label_corr_score_thresh)
+    else:
+        model = configs.model
+
     header = 'Test: Epoch [{}]'.format(epoch)
     val_loss_dict = {'loss_classifier': 0, 'loss_box_reg': 0, 'loss_mask': 0, 'loss_objectness': 0,
                      'loss_rpn_box_reg': 0}
@@ -190,10 +201,7 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20):
 
         torch.cuda.synchronize()
         with torch.no_grad():
-            configs.model.rpn.training = True
-            configs.model.roi_heads.training = True
-
-            loss_dict, outputs = configs.model(images, targets1)
+            loss_dict, outputs = model(images, targets1)
 
         if iter_per_epoch % vis_every_iter == 0:
             # (epoch+1)*iter_epoch
@@ -419,7 +427,7 @@ def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_
                     boxes = model_single_output['boxes']
                     scores = model_single_output['scores']
                     labels = model_single_output['labels']
-                    inds = torch.where(scores > 0.25)[0]
+                    inds = torch.where(scores >= configs.label_corr_score_thresh)[0]
                     boxes, scores, labels = boxes[inds], scores[inds], labels[inds]
 
                     # # remove empty boxes

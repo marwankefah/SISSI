@@ -22,6 +22,8 @@ from dataloaders.instance_seg_dataset import cell_pose_dataset
 
 from reference.engine import test_time_augmentation
 
+from reference.engine import correct_labels
+
 configs = Configs('./configs/mask_rcnn_test.ini')
 log_time = int(time.time())
 
@@ -41,7 +43,7 @@ db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'
 
 db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
 db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
-db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms)
+db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms,cache_labels=True)
 db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, ['dead'], configs.val_detections_transforms)
 
 chrisi_test_data_loader = torch.utils.data.DataLoader(
@@ -52,10 +54,10 @@ db_chrisi_alive.sample_list = random.sample(db_chrisi_alive.sample_list, 20)
 db_chrisi_dead.sample_list = random.sample(db_chrisi_dead.sample_list, 20)
 
 alive_data_loader = torch.utils.data.DataLoader(
-    db_chrisi_alive, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
+    db_chrisi_alive, batch_size=configs.labelled_bs, shuffle=False, num_workers=configs.num_workers,
     collate_fn=utils.collate_fn)
 dead_data_loader = torch.utils.data.DataLoader(
-    db_chrisi_dead, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
+    db_chrisi_dead, batch_size=configs.labelled_bs, shuffle=False, num_workers=configs.num_workers,
     collate_fn=utils.collate_fn)
 
 configs.model.to(configs.device)
@@ -77,20 +79,30 @@ medpy_dice_list = []
 tta = [oda.HorizontalFlip(), oda.VerticalFlip()]
 scale = [0.8, 0.9, 1, 1.1, 1.2]
 
-# wrap model and tta
-tta_model = oda.TTAWrapper(configs.model, tta, scale, nms="wbf", iou_thr=0.5, skip_box_thr=0.25, score_thresh=0.25)
-
 with torch.no_grad():
-    test_time_augmentation(configs, tta_model, alive_data_loader, configs.device,
-                           writer=configs.alive_writer)
-
-    test_time_augmentation(configs, tta_model, chrisi_test_data_loader, configs.device,
-                           writer=configs.chrisi_test_writer)
-
-    test_time_augmentation(configs, tta_model, dead_data_loader, configs.device,
-                           writer=configs.dead_writer)
+    # test_time_augmentation(configs, tta_model, alive_data_loader, configs.device,
+    #                        writer=configs.alive_writer)
+    #
+    # test_time_augmentation(configs, tta_model, chrisi_test_data_loader, configs.device,
+    #                        writer=configs.chrisi_test_writer)
+    #
+    # test_time_augmentation(configs, tta_model, dead_data_loader, configs.device,
+    #                        writer=configs.dead_writer)
 
     # evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
-    #          vis_every_iter=1)
-    # evaluate(configs, 0, alive_data_loader, device=configs.device, writer=configs.alive_writer, vis_every_iter=5)
+    #          vis_every_iter=1, use_tta=True)
+
+    _, outputs_list_dict = evaluate(configs, 0, alive_data_loader, device=configs.device, writer=configs.alive_writer,
+                                    vis_every_iter=5, use_tta=True)
+
+    correct_labels(configs, db_chrisi_alive , outputs_list_dict, 0, 100)
+
+    alive_data_loader = torch.utils.data.DataLoader(
+        db_chrisi_alive, batch_size=configs.labelled_bs, shuffle=False,
+        num_workers=configs.num_workers,
+        collate_fn=utils.collate_fn)
+
+    evaluate(configs, 1, alive_data_loader, device=configs.device, writer=configs.alive_writer,
+             vis_every_iter=5, use_tta=True)
+
     # evaluate(configs, 0, dead_data_loader, device=configs.device, writer=configs.dead_writer, vis_every_iter=5)

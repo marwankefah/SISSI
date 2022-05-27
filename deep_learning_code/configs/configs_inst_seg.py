@@ -98,8 +98,9 @@ class Configs:
         self.max_size = config_file.getint(
             'network', 'max_size', fallback=800)
         self.optim = config_file.get('network', 'optim', fallback='adam')
-        self.box_score_thresh =config_file.getfloat('network', 'box_score_thresh', fallback=0.05)
-        self.box_nms_thresh =config_file.getfloat('network', 'box_nms_thresh', fallback=0.3)
+        self.box_score_thresh = config_file.getfloat('network', 'box_score_thresh', fallback=0.05)
+        self.box_nms_thresh = config_file.getfloat('network', 'box_nms_thresh', fallback=0.3)
+        self.label_corr_score_thresh = config_file.getfloat('network', 'label_corr_score_thresh', fallback=0.1)
 
         self.lr_step_size = config_file.getfloat(
             'network', 'lr_step_size', fallback=8)
@@ -205,7 +206,6 @@ class Configs:
         self.need_label_correction = config_file.getboolean(
             'network', 'need_label_correction', fallback=False)
 
-
     def update_lr(self, iter_num):
         if self.optim.lower() == 'sgd':
             lr_ = self.base_lr * (1.0 - iter_num / self.max_iterations) ** 0.9
@@ -217,7 +217,8 @@ class Configs:
         model = maskrcnn_resnet50_fpn(pretrained_backbone=True, rpn_positive_fraction=0.5
                                       , rpn_fg_iou_thresh=0.7
                                       , rpn_bg_iou_thresh=0.3
-                                      , box_nms_thresh=self.box_nms_thresh,box_score_thresh=self.box_score_thresh, min_size=self.min_size, max_size=self.max_size,
+                                      , box_nms_thresh=self.box_nms_thresh, box_score_thresh=self.box_score_thresh,
+                                      min_size=self.min_size, max_size=self.max_size,
                                       box_detections_per_img=self.box_detections_per_img)
 
         # get number of input features for the classifier

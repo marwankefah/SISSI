@@ -36,8 +36,7 @@ from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset
 import reference.utils as utils
 from reference.engine import train_one_epoch, evaluate, test
 
-from reference.engine import coco_evaluate, correct_labels, save_check_point,train_mixed_one_epoch
-
+from reference.engine import coco_evaluate, correct_labels, save_check_point, train_mixed_one_epoch
 
 
 def train(configs, snapshot_path):
@@ -47,6 +46,8 @@ def train(configs, snapshot_path):
     configs.dead_writer = SummaryWriter(snapshot_path + '/log_dead')
 
     configs.chrisi_test_writer = SummaryWriter(snapshot_path + '/log_chrisi_test')
+
+    configs.chrisi_test_writer_tta = SummaryWriter(snapshot_path + '/log_chrisi_test_tta')
 
     configs.cell_pose_test_writer = SummaryWriter(snapshot_path + '/log_cell_pose_test')
 
@@ -144,34 +145,36 @@ def train(configs, snapshot_path):
 
     for epoch_num in iterator:
 
+        # train_iou, outputs_list_dict = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
+        #                                         configs.val_writer,
+        #                                         vis_every_iter=20)
 
         train_iou, outputs_list_dict = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
                                                 configs.val_writer,
-                                                vis_every_iter=20)
-
-        #TODO to TTA
+                                                vis_every_iter=20, use_tta=True)
+        # TODO to TTA
         evaluate(configs, epoch_num, chrisi_alive_data_loader, configs.device,
                  configs.alive_writer,
                  vis_every_iter=5)
 
-        #TODO to TTA
+        # TODO to TTA
         evaluate(configs, epoch_num, chrisi_dead_data_loader, configs.device,
                  configs.dead_writer,
                  vis_every_iter=5)
-        #TODO add to TTA to test
+        # TODO add to TTA to test
 
-
-        #TODO add TTA to training and use its output_list
-
-
-        evaluate(configs, epoch_num, cell_pose_test_dataloader, device=configs.device, writer=configs.cell_pose_test_writer)
+        evaluate(configs, epoch_num, cell_pose_test_dataloader, device=configs.device,
+                 writer=configs.cell_pose_test_writer)
 
         # evaluate chrisi testset
         AP_50_all, _ = evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
                                 vis_every_iter=1)
 
-        save_check_point(configs, epoch_num, AP_50_all, snapshot_path)
+        AP_50_all, _ = evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device,
+                                configs.chrisi_test_writer_tta,
+                                vis_every_iter=1, use_tta=True)
 
+        save_check_point(configs, epoch_num, AP_50_all, snapshot_path)
 
         correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_num, max_epoch)
 
@@ -180,8 +183,8 @@ def train(configs, snapshot_path):
             num_workers=configs.num_workers,
             collate_fn=utils.collate_fn)
 
-        train_mixed_one_epoch(configs, cell_pose_train_dataloader, weak_label_chrisi_dataloader, epoch_num, 20, configs.train_writer)
-
+        train_mixed_one_epoch(configs, cell_pose_train_dataloader, weak_label_chrisi_dataloader, epoch_num, 20,
+                              configs.train_writer)
 
         configs.lr_scheduler.step(AP_50_all)
 
