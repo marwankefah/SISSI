@@ -145,7 +145,6 @@ accvalidate = ada.validate(X_feat2.numpy(), Y2)
 print("Training accuracy: ", acctrain)
 print("Validation accuracy:     ", accvalidate)
 
-breakpoint()
 a = []
 for classifier in ada.Classifiers:
     a.append(classifier.feature_index)
