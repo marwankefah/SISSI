@@ -76,8 +76,7 @@ torch.cuda.manual_seed(configs.seed)
 
 medpy_dice_list = []
 
-tta = [oda.HorizontalFlip(), oda.VerticalFlip()]
-scale = [0.8, 0.9, 1, 1.1, 1.2]
+
 
 with torch.no_grad():
     # test_time_augmentation(configs, tta_model, alive_data_loader, configs.device,
@@ -90,19 +89,20 @@ with torch.no_grad():
     #                        writer=configs.dead_writer)
 
     # evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
-    #          vis_every_iter=1, use_tta=True)
+    #          vis_every_iter=1)
+    evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
+             vis_every_iter=1, use_tta=True)
+    # _, outputs_list_dict = evaluate(configs, 0, alive_data_loader, device=configs.device, writer=configs.alive_writer,
+    #                                 vis_every_iter=5, use_tta=True)
 
-    _, outputs_list_dict = evaluate(configs, 0, alive_data_loader, device=configs.device, writer=configs.alive_writer,
-                                    vis_every_iter=5, use_tta=True)
-
-    correct_labels(configs, db_chrisi_alive , outputs_list_dict, 0, 100)
-
-    alive_data_loader = torch.utils.data.DataLoader(
-        db_chrisi_alive, batch_size=configs.labelled_bs, shuffle=False,
-        num_workers=configs.num_workers,
-        collate_fn=utils.collate_fn)
-
-    evaluate(configs, 1, alive_data_loader, device=configs.device, writer=configs.alive_writer,
-             vis_every_iter=5, use_tta=True)
+    # correct_labels(configs, db_chrisi_alive , outputs_list_dict, 0, 100)
+    #
+    # alive_data_loader = torch.utils.data.DataLoader(
+    #     db_chrisi_alive, batch_size=configs.labelled_bs, shuffle=False,
+    #     num_workers=configs.num_workers,
+    #     collate_fn=utils.collate_fn)
+    #
+    # evaluate(configs, 1, alive_data_loader, device=configs.device, writer=configs.alive_writer,
+    #          vis_every_iter=5, use_tta=True)
 
     # evaluate(configs, 0, dead_data_loader, device=configs.device, writer=configs.dead_writer, vis_every_iter=5)

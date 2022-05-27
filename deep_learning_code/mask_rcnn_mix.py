@@ -85,22 +85,23 @@ def train(configs, snapshot_path):
         collate_fn=utils.collate_fn)
 
     cell_pose_test_dataloader = torch.utils.data.DataLoader(
-        db_test, batch_size=configs.val_batch_size, shuffle=True, num_workers=configs.num_workers,
+        db_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
     initial_weak_labels_data_loader = torch.utils.data.DataLoader(
-        weak_label_chrisi_dataset_val, batch_size=configs.labelled_bs, shuffle=False, num_workers=configs.num_workers,
+        weak_label_chrisi_dataset_val, batch_size=configs.labelled_bs * 4, shuffle=False,
+        num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
     db_chrisi_alive.sample_list = random.sample(db_chrisi_alive.sample_list, 20)
     db_chrisi_dead.sample_list = random.sample(db_chrisi_dead.sample_list, 20)
 
     chrisi_alive_data_loader = torch.utils.data.DataLoader(
-        db_chrisi_alive, batch_size=configs.val_batch_size, shuffle=True, num_workers=configs.num_workers,
+        db_chrisi_alive, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
     chrisi_dead_data_loader = torch.utils.data.DataLoader(
-        db_chrisi_dead, batch_size=configs.val_batch_size, shuffle=True, num_workers=configs.num_workers,
+        db_chrisi_dead, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
     chrisi_test_data_loader = torch.utils.data.DataLoader(
@@ -152,16 +153,13 @@ def train(configs, snapshot_path):
         train_iou, outputs_list_dict = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
                                                 configs.val_writer,
                                                 vis_every_iter=20, use_tta=True)
-        # TODO to TTA
         evaluate(configs, epoch_num, chrisi_alive_data_loader, configs.device,
-                 configs.alive_writer,
+                 configs.alive_writer, use_tta=True,
                  vis_every_iter=5)
 
-        # TODO to TTA
         evaluate(configs, epoch_num, chrisi_dead_data_loader, configs.device,
-                 configs.dead_writer,
+                 configs.dead_writer, use_tta=True,
                  vis_every_iter=5)
-        # TODO add to TTA to test
 
         evaluate(configs, epoch_num, cell_pose_test_dataloader, device=configs.device,
                  writer=configs.cell_pose_test_writer)
@@ -170,9 +168,9 @@ def train(configs, snapshot_path):
         AP_50_all, _ = evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
                                 vis_every_iter=1)
 
-        AP_50_all, _ = evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device,
-                                configs.chrisi_test_writer_tta,
-                                vis_every_iter=1, use_tta=True)
+        _, _ = evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device,
+                        configs.chrisi_test_writer_tta,
+                        vis_every_iter=1, use_tta=True)
 
         save_check_point(configs, epoch_num, AP_50_all, snapshot_path)
 
