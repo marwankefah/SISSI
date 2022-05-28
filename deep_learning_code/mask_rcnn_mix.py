@@ -60,13 +60,13 @@ def train(configs, snapshot_path):
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
 
     db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms,
-                                     )
+                                     cache_labels=True)
     db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, ['dead'], configs.val_detections_transforms,
-                                    )
+                                    cache_labels=True )
     # db_chrisi_inhib = chrisi_dataset(configs.chrisi_cells_root_path, 'inhib', configs.train_detections_transforms)
 
     db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
-                                    configs.val_detections_transforms)
+                                    configs.val_detections_transforms,cache_labels=True)
 
     weak_label_chrisi_dataset = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead'],
                                                configs.train_detections_transforms,

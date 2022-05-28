@@ -20,7 +20,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
         # TODO need to be cleaned before publishing (abstract self.root easier)
         self.bboxes_path_or_cache = []
         self.img_list = []
-
+        self.img_names = []
         for cell_type in self.split:
 
             bboxes_dir_path = os.path.join(self.root, 'weak_labels_reduced_nms')
@@ -48,18 +48,19 @@ class chrisi_dataset(torch.utils.data.Dataset):
                 else:
                     images_path_or_cache.append(img_path)
                     bboxes_path_or_cache.append(bboxes_path)
-            self.img_list += images_path_or_cache
+            self.images_path_or_cache += images_path_or_cache
             self.bboxes_path_or_cache += bboxes_path_or_cache
+            self.images_path += img_list
 
-        self.sample_list = list(zip(self.img_list, self.bboxes_path_or_cache))
+        self.sample_list = list(zip(self.images_path_or_cache, self.bboxes_path_or_cache))
 
     def __getitem__(self, idx):
         # load images and masks
+        img_path = self.img_list[idx]
         if self.cache_labels:
             # cell_name =
             boxes = self.sample_list[idx][1]
             img = self.sample_list[idx][0]
-
         else:
             bboxes_path = self.sample_list[idx][1]
             annotations = np.loadtxt(bboxes_path,
