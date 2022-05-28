@@ -14,7 +14,7 @@ from skimage.measure import label, regionprops
 from utils.preprocess import illumination_correction
 from alive_cells.test import nms
 import pandas as pd
-
+import scipy.ndimage.filters
 
 cell_type = 'inhib'
 data_dir = Path(
@@ -28,11 +28,24 @@ output_path = Path("../data/chrisi/weak_labels_reduced_nms/inhib")
 dead_images_raw.remove([None, '.gitignore'])
 dict_sum_counts = {}
 
+# Kernel for negative Laplacian
+kernel = np.ones((3, 3)) * (-1)
+kernel[1, 1] = 8
+
 for image, img_name in dead_images_raw:
     image_gray = rgb2gray(image)
     cell_illumination_corrected = illumination_correction(image_gray)
 
-    edges1 = feature.canny(cell_illumination_corrected, sigma=0.1)
+    Lap = scipy.ndimage.filters.convolve(cell_illumination_corrected, kernel)
+    Laps = Lap * 100.0 / np.amax(Lap)
+    A = abs(cell_illumination_corrected + Laps)
+
+    plt.imshow(A)
+    plt.show()
+
+
+
+    edges1 = feature.canny(A, sigma=0.1)
 
     SE = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
     edges1 = edges1.astype(np.uint8)
@@ -86,12 +99,12 @@ for image, img_name in dead_images_raw:
     for (xmin, ymin, xmax, ymax) in bboxes_post_nms:
         cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (255, 0, 0), 1)
 
-    boxes = pd.DataFrame(bboxes_post_nms, columns=["x_min", "y_min", "x_max", "y_max"])
-    boxes['cell_name'] = 'inhib'
+    # boxes = pd.DataFrame(bboxes_post_nms, columns=["x_min", "y_min", "x_max", "y_max"])
+    # boxes['cell_name'] = 'inhib'
 
-    filename = img_name.split(".")[0]
-    boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
-        str(output_path / Path(f"{filename}.txt")), sep=' ', header=None, index=None)
+    # filename = img_name.split(".")[0]
+    # boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
+    #     str(output_path / Path(f"{filename}.txt")), sep=' ', header=None, index=None)
 
     plt.imshow(image)
     plt.show()
