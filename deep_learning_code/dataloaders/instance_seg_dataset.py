@@ -19,7 +19,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
         # ensure that they are aligned
         # TODO need to be cleaned before publishing (abstract self.root easier)
         self.bboxes_path_or_cache = []
-        self.img_list = []
+        self.images_path_or_cache = []
         self.img_names = []
         for cell_type in self.split:
 
@@ -56,7 +56,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         # load images and masks
-        img_path = self.img_list[idx]
+        img_path = self.images_path[idx]
         if self.cache_labels:
             # cell_name =
             boxes = self.sample_list[idx][1]
