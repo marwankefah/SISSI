@@ -108,30 +108,6 @@ def train(configs, snapshot_path):
         db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
-    # coco_initial_labels = get_coco_api_from_dataset(weak_label_chrisi_dataset_val)
-
-    # score_thresh
-    # nms_thresh
-    # detections_per_img
-
-    # past_score_thresh = configs.model.roi_heads.score_thresh
-    # past_detections_per_img = configs.model.roi_heads.detections_per_img
-    # past_nms_thresh = configs.model.roi_heads.nms_thresh
-    #
-    # configs.model.roi_heads.score_thresh = 0.45
-    # configs.model.roi_heads.detections_per_img = 250
-    # configs.model.roi_heads.nms_thresh = 0.3
-
-    # evaluate(configs, 0, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
-    #          vis_every_iter=1)
-    #
-    # configs.model.roi_heads.score_thresh = past_score_thresh
-    # configs.model.roi_heads.detections_per_img = past_detections_per_img
-    # configs.model.roi_heads.nms_thresh = past_nms_thresh
-
-    # tta = [oda.HorizontalFlip(), oda.VerticalFlip(), oda.Rotate90Left(), oda.Multiply(0.9), oda.Multiply(1.1)]
-    # tta_model = oda.TTAWrapper(configs.model, tta)
-
     configs.model.train()
 
     writer = configs.train_writer
@@ -152,7 +128,8 @@ def train(configs, snapshot_path):
 
         train_iou, outputs_list_dict = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
                                                 configs.val_writer,
-                                                vis_every_iter=20, use_tta=True)
+                                                vis_every_iter=5, use_tta=True)
+
         evaluate(configs, epoch_num, chrisi_alive_data_loader, configs.device,
                  configs.alive_writer, use_tta=True,
                  vis_every_iter=5)

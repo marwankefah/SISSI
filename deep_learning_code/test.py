@@ -39,11 +39,12 @@ configs.dead_writer = SummaryWriter(snapshot_path + '/log_dead')
 configs.chrisi_test_writer = SummaryWriter(snapshot_path + '/log_chrisi_test')
 
 db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
-                                configs.val_detections_transforms)
+                                configs.val_detections_transforms, cache_labels=True)
 
 db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
 db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
-db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms,cache_labels=True)
+db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms,
+                                 cache_labels=True)
 db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, ['dead'], configs.val_detections_transforms)
 
 chrisi_test_data_loader = torch.utils.data.DataLoader(
@@ -76,8 +77,6 @@ torch.cuda.manual_seed(configs.seed)
 
 medpy_dice_list = []
 
-
-
 with torch.no_grad():
     # test_time_augmentation(configs, tta_model, alive_data_loader, configs.device,
     #                        writer=configs.alive_writer)
@@ -88,10 +87,11 @@ with torch.no_grad():
     # test_time_augmentation(configs, tta_model, dead_data_loader, configs.device,
     #                        writer=configs.dead_writer)
 
-    # evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
-    #          vis_every_iter=1)
     evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
-             vis_every_iter=1, use_tta=True)
+             vis_every_iter=1)
+    # evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
+    #          vis_every_iter=1, use_tta=True)
+
     # _, outputs_list_dict = evaluate(configs, 0, alive_data_loader, device=configs.device, writer=configs.alive_writer,
     #                                 vis_every_iter=5, use_tta=True)
 
