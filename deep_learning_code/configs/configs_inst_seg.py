@@ -11,6 +11,7 @@ import torch.optim as optim
 
 
 import reference.transforms as T
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchvision_our.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision_our.models.detection.mask_rcnn import MaskRCNNPredictor, maskrcnn_resnet50_fpn
 
@@ -79,7 +80,6 @@ class Configs:
         self.linux = config_file.getboolean('path', 'linux', fallback=False)
         self.model_path = config_file.get('path', 'model_path', fallback='')
         self.fold = config_file.getint('path', 'fold', fallback=0)
-
         self.load_model = config_file.getint('path', 'load_model', fallback=1)
 
         self.exp = config_file.get('path', 'exp', fallback='FETA/Mean_Teacher')
@@ -91,8 +91,16 @@ class Configs:
 
         self.train_mask = config_file.getboolean(
             'network', 'train_mask', fallback=False)
-
+        self.box_detections_per_img = config_file.getint(
+            'network', 'box_detections_per_img', fallback=250)
+        self.min_size = config_file.getint(
+            'network', 'min_size', fallback=400)
+        self.max_size = config_file.getint(
+            'network', 'max_size', fallback=800)
         self.optim = config_file.get('network', 'optim', fallback='adam')
+        self.box_score_thresh = config_file.getfloat('network', 'box_score_thresh', fallback=0.05)
+        self.box_nms_thresh = config_file.getfloat('network', 'box_nms_thresh', fallback=0.3)
+        self.label_corr_score_thresh = config_file.getfloat('network', 'label_corr_score_thresh', fallback=0.1)
 
         self.lr_step_size = config_file.getfloat(
             'network', 'lr_step_size', fallback=8)
@@ -164,10 +172,11 @@ class Configs:
 
         # self.lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[1, 10],
         #                                                          gamma=0.1)
+        self.train_iou_values = []
 
-        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(
-            self.optimizer, step_size=self.lr_step_size, gamma=self.lr_gamma)
-
+        # self.lr_scheduler = torch.optim.lr_scheduler.StepLR(
+        #     self.optimizer, step_size=self.lr_step_size, gamma=self.lr_gamma)
+        self.lr_scheduler = ReduceLROnPlateau(self.optimizer, 'max')
         # writers
         self.train_writer = None
         self.val_writer = None
@@ -191,6 +200,11 @@ class Configs:
             self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
             self.start_epoch = checkpoint['epoch'] + 1
             self.best_performance = checkpoint['best_performance']
+            self.train_iou_values = checkpoint['train_iou_values']
+            self.need_label_correction = checkpoint['need_label_correction']
+
+        self.need_label_correction = config_file.getboolean(
+            'network', 'need_label_correction', fallback=False)
 
     def update_lr(self, iter_num):
         if self.optim.lower() == 'sgd':
@@ -200,7 +214,12 @@ class Configs:
 
     def create_mask_rcnn(self, num_classes):
 
-        model = maskrcnn_resnet50_fpn(pretrained_backbone=True, min_size=400, max_size=800, box_detections_per_img=250)
+        model = maskrcnn_resnet50_fpn(pretrained_backbone=True, rpn_positive_fraction=0.5
+                                      , rpn_fg_iou_thresh=0.7
+                                      , rpn_bg_iou_thresh=0.3
+                                      , box_nms_thresh=self.box_nms_thresh, box_score_thresh=self.box_score_thresh,
+                                      min_size=self.min_size, max_size=self.max_size,
+                                      box_detections_per_img=self.box_detections_per_img)
 
         # get number of input features for the classifier
         in_features = model.roi_heads.box_predictor.cls_score.in_features
@@ -227,7 +246,8 @@ class Configs:
                 A.Blur(),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
-                A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1, border_mode=0, value=0, mask_value=0),
+                A.ShiftScaleRotate(p=0.5, shift_limit=0.2, scale_limit=[0.5, 1.5], border_mode=0, value=0,
+                                   mask_value=0),
                 ToTensorV2(),
             ])
             #  ,bbox_params={'format':'pascal_voc', 'min_area': 0, 'min_visibility': 0, 'label_fields': ['category_id']} )
@@ -247,7 +267,8 @@ class Configs:
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 # TODO scale parameter tuning (no zoom out just zoom in)
-                A.ShiftScaleRotate(p=1, shift_limit=0.0625, scale_limit=0.1, border_mode=0, value=0, mask_value=0),
+                A.ShiftScaleRotate(p=0.5, shift_limit=0.2, scale_limit=[0.5, 1.5], border_mode=0, value=0,
+                                   mask_value=0),
                 ToTensorV2(),
             ]
                 , bbox_params={'format': 'pascal_voc', 'min_area': 0, 'min_visibility': 0,

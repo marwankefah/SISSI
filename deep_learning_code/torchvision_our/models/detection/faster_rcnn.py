@@ -162,7 +162,9 @@ class FasterRCNN(GeneralizedRCNN):
         rpn_post_nms_top_n_test=1000,
         rpn_nms_thresh=0.7,
         rpn_fg_iou_thresh=0.7,
-        rpn_bg_iou_thresh=0.3,
+         # TODO make it lower bg_iou_thres background are so small u know
+         rpn_bg_iou_thresh=0.3,
+         #TODO make it lower rpn_batch_size_per_image (not trusting alot u know)
         rpn_batch_size_per_image=256,
         rpn_positive_fraction=0.5,
         rpn_score_thresh=0.0,

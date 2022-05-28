@@ -28,7 +28,7 @@ cell_type = 'alive'
 
 cell_path = "../data/chrisi/" + cell_type + "/"
 data_dir = Path(
-    "../data/weak_labels/" + cell_type + "/"
+    "../data/chrisi/weak_labels/" + cell_type + "/"
 )
 
 output_path = '../data/weak_labels_reduced/' + cell_type
@@ -37,18 +37,18 @@ if not os.path.exists(output_path):
 
 
 dead_images_raw = [
-    [Image.open(str(img)), str(img).split('\\')[-1]] if str(img).split('\\')[-1] != '.gitignore' else [None, None] for
+    [Image.open(str(img)), str(img).split('\\')[-1]] if str(img).split('\\')[-1].endswith('.png') else [None, None] for
     img in data_dir.iterdir()
 ]
 
-dead_images_raw.remove([None, None])
+dead_images_raw=list(filter(([None, None]).__ne__, dead_images_raw))
 dict_sum_counts = {}
 for image_mask, cell_mask_name in dead_images_raw:
     # print(cell_mask_name)
     cell_original_image = np.asarray(Image.open(os.path.join(cell_path, cell_mask_name.replace('_mask.png', '.jpg'))))
 
     label_mask_array = np.asarray(image_mask)
-    label_mask_array = skimage.segmentation.expand_labels(label_mask_array, distance=3)
+    # label_mask_array = skimage.segmentation.expand_labels(label_mask_array, distance=3)
 
     cell_bbox_image = cell_original_image.copy()
     obj_ids = np.unique(label_mask_array)
@@ -114,7 +114,7 @@ for image_mask, cell_mask_name in dead_images_raw:
     fig.tight_layout()
     # plt.savefig(os.path.join(output_path,cell_name))
     plt.show()
-    save_mask_png(maski,cell_mask_name.replace('_mask.png', '.jpg'),output_path)
+    # save_mask_png(maski,cell_mask_name.replace('_mask.png', '.jpg'),output_path)
 
 plt.bar(dict_sum_counts.keys(), dict_sum_counts.values(), color='g')
 plt.show()

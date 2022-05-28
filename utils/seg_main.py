@@ -12,7 +12,7 @@ from utils.preprocess import illumination_correction, EGT_Segmentation, mask_ove
 from utils.seed_detection import seed_detection
 
 cell_type = "inhib"
-data_dir = Path("../data/chrisi/" + cell_type + "/")
+data_dir = Path("C:\Users\Enrique Almar\PycharmProjects\cell-segmentation\data\chrisi" + cell_type + "/")
 # data_dir = Path("raw/named_images_type/" + cell_type + "/")
 
 
