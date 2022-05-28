@@ -47,19 +47,20 @@ def get_all_cells(image_dir, bbox_dir):
 
 def extract_features(save=True):
     all_cells_raw = get_all_cells(
-        Path("data/chrisi"),
-        Path("data/output/bbox"))
+        image_dir=Path("raw/named_images_split"),
+        bbox_dir=Path("data/output/bbox"))
     [cv2.imwrite(str(Path("data/cropped") / Path(cell[2]) / Path(cell[2]) / Path(f"{cell[0]}_{cell[1]}_{cell[2]}.png")), cell[3])
      for cell in all_cells_raw]
     feature_dfs = []
     print("Extracting features")
+
     for (cell_name, index, cell_type, img) in tqdm(all_cells_raw):
         # if "inhib" in cell_type:
-        # plt.imshow(img)
-        # plt.title(cell_type + str(", ") + cell_name +
-        #           str(", Cell no.: ") + str(index))
-        # plt.show()
-        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        #     plt.imshow(img)
+        #     plt.title(cell_type + str(", ") + cell_name +
+        #               str(", Cell no.: ") + str(index))
+        #     plt.show()
+        # gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         glcm_features_dict = glcm_features(gray_img)
         feature_df = pd.DataFrame(glcm_features_dict)
