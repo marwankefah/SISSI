@@ -68,11 +68,11 @@ def train(configs, snapshot_path):
     db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
                                     configs.val_detections_transforms,cache_labels=True)
 
-    weak_label_chrisi_dataset = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead'],
+    weak_label_chrisi_dataset = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead','inhib'],
                                                configs.train_detections_transforms,
-                                               cache_labels=True)
+                                               cache_labels=True,need_seam_less_clone=configs.need_seam_less_clone)
 
-    weak_label_chrisi_dataset_val = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead'],
+    weak_label_chrisi_dataset_val = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead','inhib'],
                                                    configs.val_detections_transforms,
                                                    cache_labels=True)
 
@@ -89,7 +89,7 @@ def train(configs, snapshot_path):
         collate_fn=utils.collate_fn)
 
     initial_weak_labels_data_loader = torch.utils.data.DataLoader(
-        weak_label_chrisi_dataset_val, batch_size=configs.labelled_bs * 4, shuffle=False,
+        weak_label_chrisi_dataset_val, batch_size=configs.labelled_bs, shuffle=False,
         num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
@@ -130,13 +130,13 @@ def train(configs, snapshot_path):
                                                 configs.val_writer,
                                                 vis_every_iter=5, use_tta=True)
 
-        evaluate(configs, epoch_num, chrisi_alive_data_loader, configs.device,
-                 configs.alive_writer, use_tta=True,
-                 vis_every_iter=5)
-
-        evaluate(configs, epoch_num, chrisi_dead_data_loader, configs.device,
-                 configs.dead_writer, use_tta=True,
-                 vis_every_iter=5)
+        # evaluate(configs, epoch_num, chrisi_alive_data_loader, configs.device,
+        #          configs.alive_writer, use_tta=True,
+        #          vis_every_iter=5)
+        #
+        # evaluate(configs, epoch_num, chrisi_dead_data_loader, configs.device,
+        #          configs.dead_writer, use_tta=True,
+        #          vis_every_iter=5)
 
         evaluate(configs, epoch_num, cell_pose_test_dataloader, device=configs.device,
                  writer=configs.cell_pose_test_writer)

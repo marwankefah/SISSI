@@ -97,6 +97,8 @@ class Configs:
             'network', 'min_size', fallback=400)
         self.max_size = config_file.getint(
             'network', 'max_size', fallback=800)
+        self.need_seam_less_clone = config_file.getboolean(
+            'network', 'need_seam_less_clone', fallback=False)
         self.optim = config_file.get('network', 'optim', fallback='adam')
         self.box_score_thresh = config_file.getfloat('network', 'box_score_thresh', fallback=0.05)
         self.box_nms_thresh = config_file.getfloat('network', 'box_nms_thresh', fallback=0.3)
@@ -264,6 +266,9 @@ class Configs:
                 A.Resize(self.patch_size[0], self.patch_size[1]),
                 A.ChannelShuffle(),
                 A.Blur(),
+                A.OneOf([
+                    A.GaussNoise(p=0.2,var_limit=0.01),
+                ], p=0.3),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 # TODO scale parameter tuning (no zoom out just zoom in)
