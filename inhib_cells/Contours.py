@@ -36,16 +36,16 @@ for image, img_name in dead_images_raw:
     image_gray = rgb2gray(image)
     cell_illumination_corrected = illumination_correction(image_gray)
 
-    Lap = scipy.ndimage.filters.convolve(cell_illumination_corrected, kernel)
-    Laps = Lap * 100.0 / np.amax(Lap)
-    A = abs(cell_illumination_corrected + Laps)
-
-    plt.imshow(A)
+    # Lap = scipy.ndimage.filters.convolve(cell_illumination_corrected, kernel)
+    # Laps = Lap * 100.0 / np.amax(Lap)
+    # A = abs(cell_illumination_corrected + Laps)
+    #
+    plt.imshow(cell_illumination_corrected)
     plt.show()
 
 
 
-    edges1 = feature.canny(A, sigma=0.1)
+    edges1 = feature.canny(cell_illumination_corrected, sigma=0.1)
 
     SE = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
     edges1 = edges1.astype(np.uint8)
@@ -72,8 +72,7 @@ for image, img_name in dead_images_raw:
         y2 = y0 - math.cos(orientation) * 0.5 * props.axis_major_length
 
         minr, minc, maxr, maxc = props.bbox
-        area = (maxc - minc) * (maxr - minr)
-        dict_sum_counts[area] = dict_sum_counts.get(area, 0) + 1
+        dict_sum_counts[props.area_bbox] = dict_sum_counts.get(props.area_bbox, 0) + 1
         is_large_or_small = not (props.area_bbox < 400 or props.area_bbox > 8000)
         if is_large_or_small and minc < maxc and minr < maxr:
             boxes.append([minc, minr, maxc, maxr])
@@ -84,7 +83,7 @@ for image, img_name in dead_images_raw:
             boxeslist["y_max"].append(maxr)
             cv2.rectangle(img, (minr, minr),
                            (maxc, maxr), (255, 0, 0), 1)
-            boxes_area.append(area)
+            boxes_area.append(props.area_bbox)
         else:
             pass
 
