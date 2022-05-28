@@ -20,7 +20,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
         # TODO need to be cleaned before publishing (abstract self.root easier)
         self.bboxes_path_or_cache = []
         self.images_path_or_cache = []
-        self.img_names = []
+        self.images_path = []
         for cell_type in self.split:
 
             bboxes_dir_path = os.path.join(self.root, 'weak_labels_reduced_nms')
