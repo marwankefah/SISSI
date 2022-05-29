@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import cv2
 from pathlib import Path
 from settings import data_dir
+from tqdm import tqdm
 
 
 def get_bboxes_dead(img):
@@ -58,9 +59,11 @@ if __name__ == "__main__":
 
     bbox_output_path.mkdir(exist_ok=True)
     mask_output_path.mkdir(exist_ok=True)
-    for img, img_name in dead_images_raw:
-        filename = img_name.split(".")[0]
+    for img, img_name in tqdm(dead_images_raw):
+        filename = img_name.split(".")[0].split("/")[-1]
         bboxes, mask = get_bboxes_dead(img)
         bboxes.to_csv(
             str(bbox_output_path/Path(f"{filename}.txt")), sep=' ', header=None, index=None)
         cv2.imwrite(str(mask_output_path / Path(f"{filename}.png")), mask)
+
+    print(f"Bounding boxes saved to: {str(bbox_output_path)}")
