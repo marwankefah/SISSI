@@ -7,14 +7,21 @@ import torch
 from PIL import Image
 import cv2
 
+import dataloaders.utils as utils
 
 class chrisi_dataset(torch.utils.data.Dataset):
-    def __init__(self, root, split, transforms, cache_labels=False, shuffle=False, patch_size=[512, 512]):
+    def __init__(self, root, split, transforms, cache_labels=False, shuffle=False, patch_size=[512, 512],
+                 need_seam_less_clone=False,
+                 seam_less_clone_k_size=(71, 71),
+                 seam_less_blur_sigma=30):
         self.root = root
         self.transforms = transforms
         self.split = split
         self.patch_size = patch_size
         self.cache_labels = cache_labels
+        self.need_seam_less_clone = need_seam_less_clone
+        self.seam_less_clone_k_size = seam_less_clone_k_size
+        self.seam_less_blur_sigma = seam_less_blur_sigma
         # load all image files, sorting them to
         # ensure that they are aligned
         # TODO need to be cleaned before publishing (abstract self.root easier)
@@ -74,6 +81,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
         # TODO abstract and find another solution
 
         boxes_post_process = []
+        img_mask = np.zeros_like(img)
         for box in boxes:
             xmin = box[0]
             ymin = box[1]
@@ -82,9 +90,14 @@ class chrisi_dataset(torch.utils.data.Dataset):
             if xmin < xmax and ymin < ymax and xmin >= 0 and ymin >= 0 and xmax < img.shape[
                 1] and ymax < img.shape[0]:
                 boxes_post_process.append(box)
+                img_mask[ymin:ymax, xmin:xmax, :] = 1
             else:
                 # print(xmin, xmax, ymin, ymax, img.shape)
                 pass
+
+        if self.need_seam_less_clone:
+            img = utils.seam_less_clone(img, img_mask, ksize=self.seam_less_clone_k_size,
+                                       sigma=self.seam_less_blur_sigma)
 
         boxes = boxes_post_process
         labels = [1] * len(boxes)

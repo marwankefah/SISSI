@@ -39,7 +39,7 @@ configs.dead_writer = SummaryWriter(snapshot_path + '/log_dead')
 configs.chrisi_test_writer = SummaryWriter(snapshot_path + '/log_chrisi_test')
 
 db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
-                                configs.val_detections_transforms, cache_labels=True)
+                                configs.val_detections_transforms, cache_labels=True,need_seam_less_clone=True)
 
 db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
 db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
@@ -87,10 +87,10 @@ with torch.no_grad():
     # test_time_augmentation(configs, tta_model, dead_data_loader, configs.device,
     #                        writer=configs.dead_writer)
 
-    evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
-             vis_every_iter=1)
-    # evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
-    #          vis_every_iter=1, use_tta=True)
+    # evaluate(configs, 1, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
+    #          vis_every_iter=1)
+    evaluate(configs, 1, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
+             vis_every_iter=1, use_tta=True)
 
     # _, outputs_list_dict = evaluate(configs, 0, alive_data_loader, device=configs.device, writer=configs.alive_writer,
     #                                 vis_every_iter=5, use_tta=True)
@@ -105,4 +105,4 @@ with torch.no_grad():
     # evaluate(configs, 1, alive_data_loader, device=configs.device, writer=configs.alive_writer,
     #          vis_every_iter=5, use_tta=True)
 
-    # evaluate(configs, 0, dead_data_loader, device=configs.device, writer=configs.dead_writer, vis_every_iter=5)
+    # evaluate(configs, 1, dead_data_loader, device=configs.device, writer=configs.dead_writer, vis_every_iter=5)
