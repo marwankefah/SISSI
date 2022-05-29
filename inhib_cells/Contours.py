@@ -1,4 +1,3 @@
-from tkinter import N
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
@@ -16,6 +15,7 @@ from utils.preprocess import illumination_correction
 from alive_cells.test import nms
 import pandas as pd
 import scipy.ndimage.filters
+from tqdm import tqdm
 
 
 def get_bboxes_inhib(image):
@@ -84,8 +84,7 @@ def get_bboxes_inhib(image):
     boxes = pd.DataFrame(bboxes_post_nms, columns=[
                          "x_min", "y_min", "x_max", "y_max"])
     boxes['cell_name'] = 'inhib'
-
-    return bboxes_post_nms[["cell_name", "x_min", "y_min", "x_max", "y_max"]]
+    return boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]]
 
 
 if __name__ == "__main__":
@@ -95,9 +94,14 @@ if __name__ == "__main__":
         "data/chrisi/" + cell_type + "/"
     )
     dead_images_raw = [
-        [cv2.imread(str(img)), str(img).split('\\')[-1]] for img in data_dir.iterdir()]
+        [cv2.imread(str(img)), str(img).split('\\')[-1]] for img in
+        data_dir.iterdir() if ".jpg" in str(img)]
 
-    output_path = Path("data/chrisi/weak_labels_reduced_nms/inhib")
+    output_path = Path("data/chrisi/output")
+    output_path.mkdir(exist_ok=True)
+
+    bbox_output_path = output_path/Path("bbox")
+    bbox_output_path.mkdir(exist_ok=True)
 
     # dead_images_raw.remove([None, '.gitignore'])
     dict_sum_counts = {}
@@ -106,14 +110,15 @@ if __name__ == "__main__":
     kernel = np.ones((3, 3)) * (-1)
     kernel[1, 1] = 8
 
-    for image, img_name in dead_images_raw:
-        bboxes_post_nms = get_bboxes_inhib(image)
-        for (xmin, ymin, xmax, ymax) in bboxes_post_nms:
+    for image, img_name in tqdm(dead_images_raw):
+        boxes = get_bboxes_inhib(image)
+        for i, (cell_name, xmin, ymin, xmax, ymax) in boxes.iterrows():
             cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (255, 0, 0), 1)
 
-        # filename = img_name.split(".")[0]
-        # boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
-        #     str(output_path / Path(f"{filename}.txt")), sep=' ', header=None, index=None)
+        filename = img_name.split(".")[0].split("/")[-2]
+        boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
+            str(bbox_output_path / Path(f"{filename}.txt")), sep=' ', header=None, index=None)
 
         # plt.imshow(image)
         # plt.show()
+    print(f"Bounding boxes saved to: {str(bbox_output_path)}")
