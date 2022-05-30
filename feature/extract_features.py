@@ -71,6 +71,5 @@ def extract_features(save=True):
     # features = pd.concat(feature_dfs)
     # features.to_csv(output_dir/Path("glcm_features.csv"))
 
-
 if __name__ == "__main__":
     extract_features()
