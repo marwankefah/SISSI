@@ -39,13 +39,13 @@ configs.dead_writer = SummaryWriter(snapshot_path + '/log_dead')
 configs.chrisi_test_writer = SummaryWriter(snapshot_path + '/log_chrisi_test')
 
 db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
-                                configs.val_detections_transforms, cache_labels=True,need_seam_less_clone=True)
+                                configs.val_detections_transforms, cache_labels=True,need_seam_less_clone=False)
 
 db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
 db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
 db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms,
                                  cache_labels=True)
-db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, ['dead'], configs.val_detections_transforms)
+db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, ['dead'], configs.val_detections_transforms, cache_labels=True)
 
 chrisi_test_data_loader = torch.utils.data.DataLoader(
     db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
@@ -87,8 +87,8 @@ with torch.no_grad():
     # test_time_augmentation(configs, tta_model, dead_data_loader, configs.device,
     #                        writer=configs.dead_writer)
 
-    # evaluate(configs, 1, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
-    #          vis_every_iter=1)
+    evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
+             vis_every_iter=1)
     evaluate(configs, 1, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
              vis_every_iter=1, use_tta=True)
 
