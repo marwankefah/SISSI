@@ -6,6 +6,7 @@ from torchvision import datasets, transforms
 from pathlib import Path
 from feature.Classifier import *
 from sklearn.model_selection import train_test_split
+import pickle as pkl
 
 
 def loadData(path, transforms=[], batchsize=4096):
@@ -28,17 +29,16 @@ def loadsplitData(path, transforms, train_batchsize=10000, test_batchsize=4000):
 
 
 def load_balanced_data(path, transforms, train_batchsize=10000, test_batchsize=4000):
-    breakpoint()
     dead_path = path/Path("dead")
     alive_path = path/Path("alive")
     inhib_path = path/Path("inhib")
 
     dead_trainloader = loadData(
-        str(dead_path), transforms, batchsize=5000)
+        str(dead_path), transforms, batchsize=7000)
     alive_trainloader = loadData(
-        str(alive_path), transforms, batchsize=5000)
+        str(alive_path), transforms, batchsize=7000)
     inhib_trainloader = loadData(
-        str(inhib_path), transforms, batchsize=5000)
+        str(inhib_path), transforms, batchsize=7000)
 
     deaditer = iter(dead_trainloader)
     aliveiter = iter(alive_trainloader)
@@ -47,15 +47,13 @@ def load_balanced_data(path, transforms, train_batchsize=10000, test_batchsize=4
     images_dead, labels_dead = deaditer.next()
     images_alive, labels_alive = aliveiter.next()
     images_inhib, labels_inhib = inhibiter.next()
-
     X = torch.concat((images_dead[0:7000], images_alive[0:7000],
                       images_inhib[0:7000]))
-    y = torch.concat((labels_dead[0:7000], labels_alive[0:7000],
-                      labels_inhib[0:7000]))
+    y = torch.concat((labels_dead[0:7000], labels_alive[0:7000]+1,
+                      labels_inhib[0:7000]+2))
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.3, random_state=42)
-
     return X_train, X_test, y_train, y_test
 
 
@@ -144,34 +142,42 @@ def processimage(img, path, transforms=defineTransforms(), device="cpu"):
 
 def getProcessedData(path1, path2, train_batchsize=512, test_batchsize=512, transform=defineTransforms(), device="cpu"):
     df = pd.read_csv(path2)
-    trainloader, testloader = loadsplitData(
+    X_train, X_test, y_train, y_test = load_balanced_data(
         path1, transforms=transform, train_batchsize=train_batchsize, test_batchsize=test_batchsize)
     real, imag = build_filters()
+    images_train = gaborvector(X_train, real, imag, device=device)
+    train_data = images_train[:, df["x"].values]
+    train_labels = y_train
 
-    data = None
-    data_labels = None
+    images_test = gaborvector(X_test, real, imag, device=device)
+    test_data = images_test[:, df["x"].values]
+    test_labels = y_test
+
+    trainloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_data, train_labels),
+                                              batch_size=train_batchsize)
+    testloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(test_data, test_labels),
+                                             batch_size=test_batchsize, shuffle=True)
+    return trainloader, testloader
+
+
+def save_gabor_feats(path1, path2, transform, train_batchsize, device="cpu"):
+    breakpoint()
+    df = pd.read_csv(path2)
+    datas = datasets.ImageFolder(path1, transform=transform)
+    trainloader = torch.utils.data.DataLoader(
+        datas, batch_size=train_batchsize, shuffle=False)
+    real, imag = build_filters()
 
     for images, labels in trainloader:
         # images = images.reshape(-1, images.shape[2], images.shape[3])
         images = gaborvector(images, real, imag, device=device)
         data = images[:, df["x"].values]
-        data_labels = labels
         break
 
-    testdata = None
-    test_labels = None
-    for images, labels in testloader:
-        images = gaborvector(images, real, imag, device=device)
-        testdata = images[:, df["x"].values]
-        test_labels = labels
-        break
-
-    trainloader2 = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data, data_labels),
-                                               batch_size=train_batchsize)
-
-    testloader2 = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(testdata, test_labels),
-                                              batch_size=test_batchsize, shuffle=True)
-    return trainloader2, testloader2
+    arraytosave = np.array([data, data.imgs])
+    fileObject = open("data/output/gabor_features.pkl", 'wb')
+    pkl.dump(arraytosave, fileObject)
+    return
 
 
 def getmodelfortesting(path, lr=0.001, dropout=0.2, device="cpu"):

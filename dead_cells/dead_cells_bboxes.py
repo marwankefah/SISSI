@@ -3,27 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from pathlib import Path
+from settings import data_dir
 
 
-# dead_data_path = Path("../data/chrisi/dead")
-dead_data_path = Path("raw/named_images_type/dead")
-
-
-dead_images_raw = [
-    [cv2.imread(str(img), cv2.IMREAD_GRAYSCALE), str(img).split("/")[-1]]
-    for img in dead_data_path.iterdir() if ".jpg" in str(img)
-]
-
-output_path = Path(
-    "./data/chrisi/dead/output")
-bbox_output_path = output_path/Path("bbox")
-mask_output_path = output_path/Path("mask")
-
-bbox_output_path.mkdir(exist_ok=True)
-mask_output_path.mkdir(exist_ok=True)
-
-
-for img, img_name in dead_images_raw:
+def get_bboxes_dead(img):
     circles = cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 10, minDist=25,
                                param1=100, param2=0.1, minRadius=7,
                                maxRadius=15
@@ -53,14 +36,31 @@ for img, img_name in dead_images_raw:
             i += 1
 
         bboxes = pd.DataFrame(bbox)
+
+        return bboxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]], mask
+
+
+if __name__ == "__main__":
+    dead_data_path = Path("data/chrisi/dead")
+    # dead_data_path = Path("raw/named_images_type/dead")
+
+    dead_images_raw = [
+        [cv2.imread(str(img), cv2.IMREAD_GRAYSCALE), str(img).split("/")[-1]]
+        for img in dead_data_path.iterdir() if ".jpg" in str(img)
+    ]
+
+    output_path = Path(
+        "data/chrisi/output")
+    output_path.mkdir(exist_ok=True)
+
+    bbox_output_path = output_path/Path("bbox")
+    mask_output_path = output_path/Path("mask")
+
+    bbox_output_path.mkdir(exist_ok=True)
+    mask_output_path.mkdir(exist_ok=True)
+    for img, img_name in dead_images_raw:
         filename = img_name.split(".")[0]
-        bboxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
+        bboxes, mask = get_bboxes_dead(img)
+        bboxes.to_csv(
             str(bbox_output_path/Path(f"{filename}.txt")), sep=' ', header=None, index=None)
-
-        # cv2.imshow("output", np.hstack([img, output]))
-        cv2.imwrite(str(output_path / img_name), np.hstack([img, mask]))
-        # print(output_path / Path("mask") / img_name)
-        cv2.imwrite(str(mask_output_path /
-                    Path(f"{filename}.png")), mask)
-
-        # cv2.waitKey(0)
+        cv2.imwrite(str(mask_output_path / Path(f"{filename}.png")), mask)

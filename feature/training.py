@@ -1,4 +1,3 @@
-from tabnanny import verbose
 import feature.Classifier as cl
 import feature.helper as hf
 import torch
@@ -21,9 +20,8 @@ modelpath = Path("model/checkpoint.pth")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
-
 trainloader, testloader = hf.getProcessedData(
-    data_path, feat_path, 7000, 5000, transform=train_transforms)
+    data_path, feat_path, 21000, 5000, transform=train_transforms)
 
 
 def roc_auc_score_multiclass(actual_class, pred_class, average="macro"):
@@ -59,7 +57,7 @@ for train_images, train_labels in trainloader:
     # model = SVC(probability=True)
 
     model = MLPClassifier(solver='adam', alpha=1e-5,
-                          hidden_layer_sizes=(128, 64, 32),
+                          hidden_layer_sizes=(256, 128, 64),
                           learning_rate_init=0.0003, random_state=1,
                           batch_size=128, verbose=True, max_iter=max_iter,
                           early_stopping=True, n_iter_no_change=n_iter_no_change)

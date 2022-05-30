@@ -43,11 +43,11 @@ def if_update(iou_value, current_epoch, n_epoch=16, threshold=0.90, eval_interva
     # check iou_value
     start_iter = 0
     print("len(iou_value)=", len(iou_value))
-    for k in range(len(iou_value) - 1):
-        if iou_value[k + 1] - iou_value[k] < 0.1:
-            start_iter = max(start_iter, k + 1)
-        else:
-            break
+    # for k in range(len(iou_value) - 1):
+    #     if iou_value[k + 1] - iou_value[k] < 0.1:
+    #         start_iter = max(start_iter, k + 1)
+    #     else:
+    #         break
     shifted_epoch = start_iter * eval_interval / num_iter_per_epoch
     # cut out the first few entries
     iou_value = iou_value[start_iter:]
@@ -55,6 +55,7 @@ def if_update(iou_value, current_epoch, n_epoch=16, threshold=0.90, eval_interva
                                       num_iter_per_epoch=num_iter_per_epoch)
     # Shift back
     update_epoch = shifted_epoch + update_epoch
+    print(update_epoch)
     return current_epoch >= update_epoch  # , update_epoch
 
 
