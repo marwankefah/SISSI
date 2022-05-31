@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 
 def get_bboxes_dead(img):
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     circles = cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 10, minDist=25,
                                param1=100, param2=0.1, minRadius=7,
                                maxRadius=15
@@ -17,7 +18,7 @@ def get_bboxes_dead(img):
     mask = np.zeros_like(img)
 
     if circles is not None:
-        bbox = {"cell_name": [], "x_min": [],
+        bbox = {"cell_type": [], "x_min": [],
                 "y_min": [], "x_max": [], "y_max": []}
 
         circles = np.round(circles[0, :]).astype("int")
@@ -29,7 +30,7 @@ def get_bboxes_dead(img):
 
             cv2.rectangle(output, (x - r - 10, y - r - 10),
                           (x + r + 10, y + r + 10), (255, 0, 0), 2)
-            bbox["cell_name"].append("dead")
+            bbox["cell_type"].append("dead")
             bbox["x_min"].append(max(x - r - 10, 0))
             bbox["y_min"].append(max(y - r - 10, 0))
             bbox["x_max"].append(min(x + r + 10, img.shape[1]-1))
@@ -38,7 +39,7 @@ def get_bboxes_dead(img):
 
         bboxes = pd.DataFrame(bbox)
 
-        return bboxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]], mask
+        return bboxes[["cell_type", "x_min", "y_min", "x_max", "y_max"]]
 
 
 if __name__ == "__main__":
