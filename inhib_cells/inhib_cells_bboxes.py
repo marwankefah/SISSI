@@ -37,7 +37,7 @@ def get_bboxes_inhib(image):
     # fig, ax = plt.subplots()
     # ax.imshow(image, cmap=plt.cm.gray)
     # plt.show()
-    boxeslist = {"cell_name": [], "x_min": [],
+    boxeslist = {"cell_type": [], "x_min": [],
                  "y_min": [], "x_max": [], "y_max": []}
     dict_sum_counts = {}
     boxes_area = []
@@ -58,7 +58,7 @@ def get_bboxes_inhib(image):
             props.area_bbox < 400 or props.area_bbox > 80000)
         if is_large_or_small and minc < maxc and minr < maxr:
             boxes.append([minc, minr, maxc, maxr])
-            boxeslist["cell_name"].append("inhib")
+            boxeslist["cell_type"].append("inhib")
             boxeslist["x_min"].append(minc)
             boxeslist["y_min"].append(minr)
             boxeslist["x_max"].append(maxc)
@@ -83,8 +83,8 @@ def get_bboxes_inhib(image):
 
     boxes = pd.DataFrame(bboxes_post_nms, columns=[
                          "x_min", "y_min", "x_max", "y_max"])
-    boxes['cell_name'] = 'inhib'
-    return boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]]
+    boxes['cell_type'] = 'inhib'
+    return boxes[["cell_type", "x_min", "y_min", "x_max", "y_max"]]
 
 
 if __name__ == "__main__":
@@ -116,7 +116,7 @@ if __name__ == "__main__":
             cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (255, 0, 0), 1)
 
         filename = img_name.split(".")[0].split("/")[-2]
-        boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
+        boxes[["cell_type", "x_min", "y_min", "x_max", "y_max"]].to_csv(
             str(bbox_output_path / Path(f"{filename}.txt")), sep=' ', header=None, index=None)
 
         # plt.imshow(image)
