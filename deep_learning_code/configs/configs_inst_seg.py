@@ -111,6 +111,9 @@ class Configs:
         self.label_correction = config_file.getboolean(
             'network', 'label_correction', fallback=False)
 
+        self.overload_rcnn_predictor = config_file.getboolean(
+            'network', 'overload_rcnn_predictor', fallback=False)
+
         self.label_correction_threshold = config_file.getfloat(
             'network', 'label_correction_threshold', fallback=0.9)
 
@@ -156,8 +159,12 @@ class Configs:
             'network', 'num_classes', fallback=2)
         self.in_channels = config_file.getint(
             'network', 'in_channels', fallback=1)
+        if self.overload_rcnn_predictor:
+            #overload blob detection
+            self.model = self.create_mask_rcnn(2)
+        else:
+            self.model = self.create_mask_rcnn(self.num_classes)
 
-        self.model = self.create_mask_rcnn(self.num_classes)
         use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if use_cuda else "cpu")
 
@@ -204,6 +211,11 @@ class Configs:
             self.best_performance = checkpoint['best_performance']
             self.train_iou_values = checkpoint['train_iou_values']
             self.need_label_correction = checkpoint['need_label_correction']
+
+        if self.overload_rcnn_predictor:
+            in_features = self.model.roi_heads.box_predictor.cls_score.in_features
+            self.model.roi_heads.box_predictor = FastRCNNPredictor(
+                in_features, self.num_classes)
 
         self.need_label_correction = config_file.getboolean(
             'network', 'need_label_correction', fallback=False)
@@ -266,14 +278,14 @@ class Configs:
                 A.Resize(self.patch_size[0], self.patch_size[1]),
                 A.ChannelShuffle(),
                 A.Blur(),
-                A.OneOf([
-                    A.GaussNoise(p=0.2,var_limit=0.01),
-                ], p=0.3),
+                # A.OneOf([
+                #     A.GaussNoise(p=0.2, var_limit=0.01),
+                # ], p=0.3),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 # TODO scale parameter tuning (no zoom out just zoom in)
-                A.ShiftScaleRotate(p=0.5, shift_limit=0.2, scale_limit=[0.5, 1.5], border_mode=0, value=0,
-                                   mask_value=0),
+                # A.ShiftScaleRotate(p=0.5, shift_limit=0.2, scale_limit=[0.5, 1.5], border_mode=0, value=0,
+                #                    mask_value=0),
                 ToTensorV2(),
             ]
                 , bbox_params={'format': 'pascal_voc', 'min_area': 0, 'min_visibility': 0,

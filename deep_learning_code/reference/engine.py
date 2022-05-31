@@ -23,7 +23,8 @@ from reference.preprocess import mask_overlay
 category_ids = [1]
 # We will use the mapping from category_id to the class name
 # to visualize the class label for the bounding box on the image
-category_id_to_name = {1: 'cell'}
+
+category_id_to_name = {1: 'alive', 2: 'inhib', 3: 'dead'}
 
 
 def train_mixed_one_epoch(configs, data_loader_labeled, data_loader_weak, epoch, print_freq, writer):
@@ -155,7 +156,7 @@ def train_one_iter(configs, iter_epoch, epoch, images, targets, writer):
 
     if iter_epoch % 20 == 0:
         # (epoch+1)*iter_epoch
-        output_vis_to_tensorboard(images, targets, outputs, (iter_epoch + 1) *epoch , writer, configs.train_mask)
+        output_vis_to_tensorboard(images, targets, outputs, (iter_epoch + epoch * 200), writer, configs.train_mask)
     return loss_dict_reduced, loss_value
 
 
@@ -206,7 +207,7 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20, use
 
         if iter_per_epoch % vis_every_iter == 0:
             # (epoch+1)*iter_epoch
-            output_vis_to_tensorboard(images, targets1, outputs, (iter_per_epoch + 1) * epoch, writer,
+            output_vis_to_tensorboard(images, targets1, outputs, (iter_per_epoch + epoch * 200), writer,
                                       configs.train_mask)
             logging.info('Evaluation [{}/{}] '.format(iter_per_epoch, total_iter_per_epoch))
 
@@ -278,7 +279,7 @@ def test(configs, epoch, data_loader, device, writer):
 
         if iter_per_epoch % 10 == 0:
             # (epoch+1)*iter_epoch
-            output_vis_to_tensorboard(images, targets1, outputs, (iter_per_epoch + 1) *epoch , writer,
+            output_vis_to_tensorboard(images, targets1, outputs, (iter_per_epoch + epoch * 200), writer,
                                       configs.train_mask)
 
     # torch.set_num_threads(n_threads)
