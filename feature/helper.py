@@ -161,7 +161,6 @@ def getProcessedData(path1, path2, train_batchsize=512, test_batchsize=512, tran
 
 
 def save_gabor_feats(path1, path2, transform, train_batchsize, device="cpu"):
-    breakpoint()
     df = pd.read_csv(path2)
     datas = datasets.ImageFolder(path1, transform=transform)
     trainloader = torch.utils.data.DataLoader(
