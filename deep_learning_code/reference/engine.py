@@ -448,7 +448,7 @@ import os
 def save_check_point(configs, epoch_num, perforamnce, snapshot_path):
     save_mode_path = os.path.join(snapshot_path,
                                   'epoch_{}_perforamnce_{}.pth'.format(
-                                      epoch_num, round(perforamnce, 4)))
+                                      epoch_num, round(float(perforamnce.detach().cpu().numpy()), 4)))
     logging.info('saving model with best performance {}'.format(perforamnce))
     utils.save_on_master({
         'model': configs.model.state_dict(),

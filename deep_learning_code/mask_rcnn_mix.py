@@ -94,9 +94,10 @@ def train(configs, snapshot_path):
 
     for epoch_num in iterator:
 
-        train_iou, outputs_list_dict = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
+        train_iou, outputs_list_dict,_ = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
                                                 configs.val_writer,
                                                 vis_every_iter=5, use_tta=configs.need_label_correction)
+        configs.train_iou_values.append(train_iou)
 
         _, _, val_losses_reduced = evaluate(configs, epoch_num, cell_pose_test_dataloader, device=configs.device,
                                             writer=configs.cell_pose_test_writer)
@@ -124,7 +125,6 @@ def train(configs, snapshot_path):
 
         configs.lr_scheduler.step(val_losses_reduced)
 
-        configs.train_iou_values.append(train_iou)
 
         if iter_num >= configs.max_iterations:
             break
