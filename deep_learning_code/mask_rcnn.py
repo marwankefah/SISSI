@@ -44,8 +44,6 @@ def train(configs, snapshot_path):
 
     db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
-    db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms)
-    db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, ['dead'], configs.val_detections_transforms)
 
     db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
                                     configs.val_detections_transforms)
@@ -53,30 +51,6 @@ def train(configs, snapshot_path):
     chrisi_test_data_loader = torch.utils.data.DataLoader(
         db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
-
-    alive_data_loader = torch.utils.data.DataLoader(
-        db_chrisi_alive, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
-        collate_fn=utils.collate_fn)
-    dead_data_loader = torch.utils.data.DataLoader(
-        db_chrisi_dead, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
-        collate_fn=utils.collate_fn)
-    # score_thresh
-    # nms_thresh
-    # detections_per_img
-    # past_score_thresh = configs.model.roi_heads.score_thresh
-    # past_detections_per_img = configs.model.roi_heads.detections_per_img
-    # past_nms_thresh = configs.model.roi_heads.nms_thresh
-    #
-    # configs.model.roi_heads.score_thresh = 0.45
-    # configs.model.roi_heads.detections_per_img = 250
-    # configs.model.roi_heads.nms_thresh = 0.3
-
-    # evaluate(configs, 0, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
-    #          vis_every_iter=1)
-    #
-    # configs.model.roi_heads.score_thresh = past_score_thresh
-    # configs.model.roi_heads.detections_per_img = past_detections_per_img
-    # configs.model.roi_heads.nms_thresh = past_nms_thresh
 
     trainloader = torch.utils.data.DataLoader(
         db_train, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
@@ -103,23 +77,15 @@ def train(configs, snapshot_path):
 
         train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
 
-        evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
-
-        evaluate(configs, epoch_num, alive_data_loader, configs.device,
-                 configs.alive_writer,
-                 vis_every_iter=20)
-
-        evaluate(configs, epoch_num, dead_data_loader, configs.device,
-                 configs.dead_writer,
-                 vis_every_iter=20)
+        _, _, val_losses_reduced = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
 
         # evaluate chrisi testset
-        AP_50_all, _=evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
-                 vis_every_iter=1)  # AP iou 0.75--all bbox
+        evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
+                                vis_every_iter=1)  # AP iou 0.75--all bbox
 
-        save_check_point(configs, epoch_num, AP_50_all, snapshot_path)
+        save_check_point(configs, epoch_num, val_losses_reduced, snapshot_path)
 
-        configs.lr_scheduler.step(AP_50_all)
+        configs.lr_scheduler.step(val_losses_reduced)
 
         if iter_num >= configs.max_iterations:
             break

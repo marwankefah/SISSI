@@ -251,6 +251,7 @@ class TTAWrapper:
 
     def model_inference(self, img, targets):
         with torch.no_grad():
+
             results = self.model(img, targets)
         return results
 

@@ -54,6 +54,10 @@ chrisi_test_data_loader = torch.utils.data.DataLoader(
 db_chrisi_alive.sample_list = random.sample(db_chrisi_alive.sample_list, 20)
 db_chrisi_dead.sample_list = random.sample(db_chrisi_dead.sample_list, 20)
 
+cell_pose_test_dataloader = torch.utils.data.DataLoader(
+    db_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
+    collate_fn=utils.collate_fn)
+
 alive_data_loader = torch.utils.data.DataLoader(
     db_chrisi_alive, batch_size=configs.labelled_bs, shuffle=False, num_workers=configs.num_workers,
     collate_fn=utils.collate_fn)
@@ -87,8 +91,12 @@ with torch.no_grad():
     # test_time_augmentation(configs, tta_model, dead_data_loader, configs.device,
     #                        writer=configs.dead_writer)
 
+    evaluate(configs, 0, cell_pose_test_dataloader, device=configs.device, writer=configs.chrisi_test_writer,
+             vis_every_iter=5)
+
     evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
              vis_every_iter=1)
+
     evaluate(configs, 1, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
              vis_every_iter=1, use_tta=True)
 

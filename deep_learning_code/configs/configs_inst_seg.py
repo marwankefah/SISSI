@@ -1,53 +1,14 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Jul 12 12:47:42 2021
 
-@author: Prinzessin
-"""
 import configparser
 import os
 import torch.optim as optim
-# from monai.transforms.utility.dictionary import Lambdad
-
-
-import reference.transforms as T
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchvision_our.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision_our.models.detection.mask_rcnn import MaskRCNNPredictor, maskrcnn_resnet50_fpn
-
-# from monai.transforms import (
-#     Activations,
-#     AddChanneld,
-#     AsDiscrete,
-#     Compose,
-#     LoadImaged,
-#     RandFlipd,
-#     RandRotated,
-#     RandZoomd,
-#     ScaleIntensityd,
-#     EnsureTyped,
-#     Resized,
-#     RandGaussianNoised,
-#     RandGaussianSmoothd,
-#     Rand2DElasticd,
-#     RandAffined,
-#     OneOf,
-#     NormalizeIntensity,
-#     AsChannelFirstd,
-#     EnsureType,
-#     LabelToMaskd
-# )
-# from monai.data.image_reader import PILReader, NibabelReader
-# from monai.metrics import DiceMetric
-
-
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
-
 import torch
-import numpy as np
-
-
 class Configs:
     def __init__(self, filename):
 
@@ -185,7 +146,7 @@ class Configs:
 
         # self.lr_scheduler = torch.optim.lr_scheduler.StepLR(
         #     self.optimizer, step_size=self.lr_step_size, gamma=self.lr_gamma)
-        self.lr_scheduler = ReduceLROnPlateau(self.optimizer, 'max')
+        self.lr_scheduler = ReduceLROnPlateau(self.optimizer, 'min')
         # writers
         self.train_writer = None
         self.val_writer = None
@@ -283,9 +244,8 @@ class Configs:
                 # ], p=0.3),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
-                # TODO scale parameter tuning (no zoom out just zoom in)
-                # A.ShiftScaleRotate(p=0.5, shift_limit=0.2, scale_limit=[0.5, 1.5], border_mode=0, value=0,
-                #                    mask_value=0),
+                A.ShiftScaleRotate(p=0.5, shift_limit=0.2, scale_limit=[0.5, 1.5], border_mode=0, value=0,
+                                   mask_value=0),
                 ToTensorV2(),
             ]
                 , bbox_params={'format': 'pascal_voc', 'min_area': 0, 'min_visibility': 0,
