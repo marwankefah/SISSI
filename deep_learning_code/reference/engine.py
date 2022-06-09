@@ -446,16 +446,16 @@ def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_
 import os
 
 
-def save_check_point(configs, epoch_num, AP_50_all, snapshot_path):
+def save_check_point(configs, epoch_num, perforamnce, snapshot_path):
     save_mode_path = os.path.join(snapshot_path,
-                                  'epoch_{}_val_loss_{}.pth'.format(
-                                      epoch_num, round(AP_50_all, 4)))
-    logging.info('saving model with best performance {}'.format(AP_50_all))
+                                  'epoch_{}_perforamnce_{}.pth'.format(
+                                      epoch_num, round(perforamnce, 4)))
+    logging.info('saving model with best performance {}'.format(perforamnce))
     utils.save_on_master({
         'model': configs.model.state_dict(),
         'optimizer': configs.optimizer.state_dict(),
         'lr_scheduler': configs.lr_scheduler.state_dict(),
         'epoch': epoch_num,
-        'best_performance': AP_50_all,
+        'best_performance': perforamnce,
         'train_iou_values': configs.train_iou_values,
         'need_label_correction': configs.need_label_correction}, save_mode_path)

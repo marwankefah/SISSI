@@ -17,13 +17,6 @@ import torch
 import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from configs.configs import *
-from dataloaders.dataset import (ddsm_dataset_labelled, BaseFetaDataSets, RandomGenerator, ResizeTransform,
-                                 TwoStreamBatchSampler)
-from configs.configs import Configs
-from monai.visualize import plot_2d_or_3d_image
-from medpy import metric
-from PIL import ImageFile
 
 from configs.configs_inst_seg import Configs
 
