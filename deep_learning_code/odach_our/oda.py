@@ -224,7 +224,7 @@ class TTAWrapper:
 
     def __init__(self, model, tta, scale=[1], nms="wbf", iou_thr=0.5, skip_box_thr=0.5, weights=None, score_thresh=0.1):
         self.ttas = self.generate_TTA(tta, scale)
-        self.model = model  # .eval()
+        self.model = model.cuda()  # .eval()
         self.score_thresh = score_thresh
         # set nms function
         # default is weighted box fusion.
@@ -251,7 +251,6 @@ class TTAWrapper:
 
     def model_inference(self, img, targets):
         with torch.no_grad():
-
             results = self.model(img, targets)
         return results
 

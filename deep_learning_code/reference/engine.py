@@ -396,12 +396,6 @@ def coco_evaluate(outputs_list_dict, coco, epoch, writer, train_mask=False):
 
 def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_num, max_epoch):
     if configs.label_correction:
-        # if the flag is false, then check every time if it needs label correction
-        # if it is true one time, it will always be true
-        if not configs.need_label_correction:
-            configs.need_label_correction = utils.if_update(configs.train_iou_values, epoch_num, n_epoch=max_epoch,
-                                                            threshold=configs.label_correction_threshold)
-
         # it needs label correction, then output the label correction in a folder and reload it again
         # no large cache memory
         if configs.need_label_correction:
@@ -442,6 +436,11 @@ def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_
                     else:
                         logging.info('image with id {} have no output'.format(idx))
 
+        # if the flag is false, then check every time if it needs label correction
+        # if it is true one time, it will always be true
+        else:
+            configs.need_label_correction = utils.if_update(configs.train_iou_values, epoch_num, n_epoch=max_epoch,
+                                                            threshold=configs.label_correction_threshold)
 
 import os
 

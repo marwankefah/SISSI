@@ -96,7 +96,7 @@ def train(configs, snapshot_path):
 
         train_iou, outputs_list_dict = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
                                                 configs.val_writer,
-                                                vis_every_iter=5, use_tta=True)
+                                                vis_every_iter=5, use_tta=configs.need_label_correction)
 
         _, _, val_losses_reduced = evaluate(configs, epoch_num, cell_pose_test_dataloader, device=configs.device,
                                             writer=configs.cell_pose_test_writer)
