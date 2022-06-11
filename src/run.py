@@ -3,7 +3,7 @@ from feature.gabor_filters import gaborvector
 from inhib_cells.inhib_cells_bboxes import get_bboxes_inhib
 from alive_cells.alive_cells_bboxes import get_bboxes_alive
 from feature.extract_features import crop_w_bboxes
-from settings import model_path, data_dir
+from settings import model_path, data_dir, output_dir
 import pickle as pkl
 from pathlib import Path
 import cv2
@@ -127,6 +127,7 @@ def pipeline(image, gabor_filter, feature_df):
     pr_inhib = model.predict_proba(inhib_feat)
 
     bboxes = get_bboxes_list(bboxes_df)
+
     dead_bboxes, dead_pr = select_bboxes(pr_dead, bboxes["bboxes_dead"], 0)
     alive_bboxes, alive_pr = select_bboxes(
         pr_alive, bboxes["bboxes_alive"], 1)
@@ -159,21 +160,52 @@ def pipeline(image, gabor_filter, feature_df):
     selected_bboxes[:, 2] *= image.shape[1]
     selected_bboxes[:, 1] *= image.shape[0]
     selected_bboxes[:, 3] *= image.shape[0]
-
     out_img = visualize(image, selected_bboxes, selected_pr,
                         selected_label, category_id_to_name={
                             1: 'alive', 2: 'inhib', 0: 'dead'})
-
+    plt.title("Image processing output")
     plt.imshow(out_img)
     plt.show()
 
-    # breakpoint()
+
+
+def pipeline_dl(image, gabor_filter, bbox_path):
+    bboxes_df = pd.read_csv(bbox_path, delimiter=' ',names=["cell_type","x_min","y_min","x_max","y_max"])
+    cropped = crop_w_bboxes(image=image, bboxes=bboxes_df)
+    
+    cropped_images = [cropped[i][2]
+                           for i in range(len(cropped))]
+    
+    cropped_images = [transform(img) for img in cropped_images]
+    
+    feat = gaborvector(torch.stack(cropped_images),
+                            gabor_filter[0], gabor_filter[1])
+
+    feat = feat[:, feature_df["x"].values]
+    
+    with open(model_path, 'rb') as f:
+        model = pkl.load(f)
+
+    pred_labels = model.predict(feat)
+    pred_pr = model.predict_proba(feat)
+
+    bboxes_numpy = bboxes_df[["x_min","y_min","x_max","y_max"]].to_numpy()
+
+    out_img = visualize(image, bboxes_numpy, np.max(pred_pr, axis=1).tolist(),
+                        pred_labels.tolist(), category_id_to_name={
+                            1: 'alive', 2: 'inhib', 0: 'dead'})
+    plt.title("Deep learning output")
+    plt.imshow(out_img)
+    plt.show()
+
 
 
 if __name__ == "__main__":
-    image_path = data_dir/Path("test_labelled/cell49.jpg")
+    image_path = data_dir/Path("test_labelled/cell218.jpg")
+    bbox_path = output_dir/Path("deep_learning_output_MB_ST_SH/test_labelled/cell218.txt")
     image = cv2.imread(str(image_path))
     real, imag = hf.build_filters()
     feature_path = Path("feature/output/gabor_index.csv")
     feature_df = pd.read_csv(feature_path)
     pipeline(image, (real, imag), feature_df)
+    pipeline_dl(image, (real, imag),bbox_path=bbox_path)
