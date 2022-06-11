@@ -9,6 +9,7 @@ from sklearn.preprocessing import label_binarize
 from sklearn.neural_network import MLPClassifier
 import pickle as pkl
 from settings import model_path
+import pandas as pd
 
 train_transforms = hf.defineTransforms()
 
@@ -65,18 +66,27 @@ for train_images, train_labels in trainloader:
 
     model.fit(train_images, train_labels)
     pred = model.predict(train_images)
-    print("Training AUC: ", roc_auc_score_multiclass(
-        train_labels, pred))
-    print(classification_report(train_labels, pred))
+    train_auc = roc_auc_score_multiclass(
+        train_labels, pred)
+    train_metrics = pd.DataFrame(classification_report(
+        train_labels, pred, output_dict=True)).reset_index()
+    train_metrics.loc[train_metrics.shape[0]] = ["ROC", train_auc[0], roc_auc_score_multiclass(
+        train_labels, pred)[1], roc_auc_score_multiclass(
+        train_labels, pred)[2], "", "", ""]
+    print(train_metrics)
+    train_metrics.to_csv("data/output/train_metrics.csv")
 
-breakpoint()
 for images, labels in testloader:
     images = images.numpy()
     labels = labels.numpy()
     test_pred = model.predict(images)
-    print("Test AUC: ", roc_auc_score_multiclass(
-        labels, test_pred))
-    print(classification_report(labels, test_pred))
-
+    val_auc = roc_auc_score_multiclass(
+        labels, test_pred)
+    test_metrics = classification_report(labels, test_pred, output_dict=True)
+    test_metrics = pd.DataFrame(test_metrics).reset_index()
+    test_metrics.loc[test_metrics.shape[0]] = [
+        "ROC", val_auc[0], val_auc[1], val_auc[2], "", "", ""]
+    print(test_metrics)
+    train_metrics.to_csv("data/output/val_metrics.csv")
     fileObject = open(model_path, 'wb')
     pkl.dump(model, fileObject)
