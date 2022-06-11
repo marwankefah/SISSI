@@ -89,67 +89,67 @@ def loadcifar(path, transforms=[], batchsize=4096):
     return trainloader
 
 
-train_transforms = transforms.Compose([transforms.Resize(22),
-                                       transforms.CenterCrop(22),
-                                       transforms.Grayscale(),
-                                       transforms.ToTensor()])
+if __name__ == "__main__":
+    train_transforms = transforms.Compose([transforms.Resize(22),
+                                           transforms.CenterCrop(22),
+                                           transforms.Grayscale(),
+                                           transforms.ToTensor()])
 
-cropped_data_path = Path("data/cropped")
-dead_path = cropped_data_path/Path("dead")
-alive_path = cropped_data_path/Path("alive")
-inhib_path = cropped_data_path/Path("inhib")
-cifar_path = Path("data/cifar")
+    cropped_data_path = Path("data/cropped")
+    dead_path = cropped_data_path/Path("dead")
+    alive_path = cropped_data_path/Path("alive")
+    inhib_path = cropped_data_path/Path("inhib")
+    cifar_path = Path("data/cifar")
 
+    dead_trainloader = loadData(
+        str(dead_path), train_transforms, batchsize=5000)
+    alive_trainloader = loadData(
+        str(alive_path), train_transforms, batchsize=5000)
+    inhib_trainloader = loadData(
+        str(inhib_path), train_transforms, batchsize=5000)
+    cifarloader = loadcifar(str(cifar_path), train_transforms, batchsize=15000)
 
-dead_trainloader = loadData(str(dead_path), train_transforms, batchsize=5000)
-alive_trainloader = loadData(str(alive_path), train_transforms, batchsize=5000)
-inhib_trainloader = loadData(str(inhib_path), train_transforms, batchsize=5000)
-cifarloader = loadcifar(str(cifar_path), train_transforms, batchsize=15000)
+    deaditer = iter(dead_trainloader)
+    aliveiter = iter(alive_trainloader)
+    inhibiter = iter(inhib_trainloader)
+    cifariter = iter(cifarloader)
 
+    images_dead, labels_dead = deaditer.next()
+    images_alive, labels_alive = aliveiter.next()
+    images_inhib, labels_inhib = inhibiter.next()
+    images_cifar, labels_cifar = cifariter.next()
+    X1 = torch.concat((images_dead[0:4000], images_alive[0:4000],
+                       images_inhib[0:4000], images_cifar[0:12000])).reshape(-1, 22, 22)
+    Y1 = np.ones((24000, 1))
+    Y1[12000::] = 0
+    X1 = X1.unsqueeze(1)
 
-deaditer = iter(dead_trainloader)
-aliveiter = iter(alive_trainloader)
-inhibiter = iter(inhib_trainloader)
-cifariter = iter(cifarloader)
+    X2 = torch.concat((images_dead[4000::], images_alive[4000::],
+                       images_inhib[4000::], images_cifar[12000::])).reshape(-1, 22, 22)
+    Y2 = np.ones((6000, 1))
+    Y2[3000::] = 0
+    X2 = X2.unsqueeze(1)
 
-images_dead, labels_dead = deaditer.next()
-images_alive, labels_alive = aliveiter.next()
-images_inhib, labels_inhib = inhibiter.next()
-images_cifar, labels_cifar = cifariter.next()
+    real, imag = build_filters()
 
-X1 = torch.concat((images_dead[0:4000], images_alive[0:4000],
-                  images_inhib[0:4000], images_cifar[0:12000])).reshape(-1, 22, 22)
-Y1 = np.ones((24000, 1))
-Y1[12000::] = 0
-X1 = X1.unsqueeze(1)
+    X_feat1 = gaborvector(X1, real, imag)
+    X_feat2 = gaborvector(X2, real, imag)
 
-X2 = torch.concat((images_dead[4000::], images_alive[4000::],
-                  images_inhib[4000::], images_cifar[12000::])).reshape(-1, 22, 22)
-Y2 = np.ones((6000, 1))
-Y2[3000::] = 0
-X2 = X2.unsqueeze(1)
+    ada = Ada.AdaBoostSelection(200)
 
+    ada.fit(X_feat1.numpy(), Y1)
 
-real, imag = build_filters()
+    acctrain = ada.validate(X_feat1.numpy(), Y1)
+    accvalidate = ada.validate(X_feat2.numpy(), Y2)
 
-X_feat1 = gaborvector(X1, real, imag)
-X_feat2 = gaborvector(X2, real, imag)
+    print("Training accuracy: ", acctrain)
+    print("Validation accuracy:     ", accvalidate)
 
-ada = Ada.AdaBoostSelection(200)
+    a = []
+    for classifier in ada.Classifiers:
+        a.append(classifier.feature_index)
 
-ada.fit(X_feat1.numpy(), Y1)
-
-acctrain = ada.validate(X_feat1.numpy(), Y1)
-accvalidate = ada.validate(X_feat2.numpy(), Y2)
-
-print("Training accuracy: ", acctrain)
-print("Validation accuracy:     ", accvalidate)
-
-a = []
-for classifier in ada.Classifiers:
-    a.append(classifier.feature_index)
-
-col = {"x": a}
-df = pd.DataFrame(col)
-df.insert(0, "x", a, True)
-df.to_csv("feature/output/gabor_index.csv")
+    col = {"x": a}
+    df = pd.DataFrame(col)
+    df.insert(0, "x", a, True)
+    df.to_csv("feature/output/gabor_index.csv")

@@ -7,7 +7,8 @@ from sklearn.svm import SVC
 from sklearn.metrics import roc_auc_score, classification_report
 from sklearn.preprocessing import label_binarize
 from sklearn.neural_network import MLPClassifier
-
+import pickle as pkl
+from settings import model_path
 
 train_transforms = hf.defineTransforms()
 
@@ -68,6 +69,7 @@ for train_images, train_labels in trainloader:
         train_labels, pred))
     print(classification_report(train_labels, pred))
 
+breakpoint()
 for images, labels in testloader:
     images = images.numpy()
     labels = labels.numpy()
@@ -75,3 +77,6 @@ for images, labels in testloader:
     print("Test AUC: ", roc_auc_score_multiclass(
         labels, test_pred))
     print(classification_report(labels, test_pred))
+
+    fileObject = open(model_path, 'wb')
+    pkl.dump(model, fileObject)

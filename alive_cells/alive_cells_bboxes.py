@@ -1,16 +1,18 @@
 import cv2
 import skimage
 import numpy as np
-from findmaxima2d import find_maxima, find_local_maxima  # Version that has been installed into python site-packages.
+# Version that has been installed into python site-packages.
+from findmaxima2d import find_maxima, find_local_maxima
 import pandas as pd
 from utils.preprocess import illumination_correction, imreconstruct, imposemin
 from skimage.segmentation import watershed
 from scipy import ndimage as ndi
 from pathlib import Path
 
+
 def get_bboxes_alive(img):
 
-    #gamma correction for the image
+    # gamma correction for the image
     lookUpTable = np.empty((1, 256), np.uint8)
     gamma = 1.5
     for i in range(256):
@@ -18,49 +20,57 @@ def get_bboxes_alive(img):
 
     res = cv2.LUT(img, lookUpTable)
 
-    #clahe in the hsv space (cut on value)
+    # clahe in the hsv space (cut on value)
     hsv_img = cv2.cvtColor(res, cv2.COLOR_BGR2HSV)
     h, s, v = hsv_img[:, :, 0], hsv_img[:, :, 1], hsv_img[:, :, 2]
     clahe = cv2.createCLAHE(clipLimit=15.0, tileGridSize=(20, 20))
     v = clahe.apply(v)
     hsv_img = np.dstack((h, s, v))
 
-    #return to the rgb space
+    # return to the rgb space
     rgb = cv2.cvtColor(hsv_img, cv2.COLOR_HSV2RGB)
 
-    #getting external borders for watershed
+    # getting external borders for watershed
     img1 = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
     img2 = cv2.medianBlur(img1, 5)
     img3 = cv2.bilateralFilter(img2, 9, 75, 75)
-    img4 = cv2.adaptiveThreshold(img3, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 29, 0)
-    img5 = skimage.img_as_ubyte(skimage.morphology.skeletonize(skimage.img_as_bool(img4)))
+    img4 = cv2.adaptiveThreshold(
+        img3, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 29, 0)
+    img5 = skimage.img_as_ubyte(
+        skimage.morphology.skeletonize(skimage.img_as_bool(img4)))
 
-
-    #edge detection with sobel
+    # edge detection with sobel
     sobelx = cv2.Sobel(img1, cv2.CV_64F, 1, 0)  # Find x and y gradients
     sobely = cv2.Sobel(img1, cv2.CV_64F, 0, 1)
     magnitude = np.sqrt(sobelx ** 2.0 + sobely ** 2.0)
     # angle = np.arctan2(sobely, sobelx) * (180 / np.pi)
-    magnitude = cv2.normalize(magnitude, magnitude, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    magnitude = cv2.normalize(magnitude, magnitude, 0,
+                              255, cv2.NORM_MINMAX).astype(np.uint8)
 
-    #distancing blobs away from each others
+    # distancing blobs away from each others
     SE = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (20, 20))
     eroded_image = cv2.morphologyEx(img1, cv2.MORPH_ERODE, SE)
     opened_by_reconstruction = imreconstruct(eroded_image, img1, radius=5)
-    dilated_obr_image = cv2.morphologyEx(opened_by_reconstruction, cv2.MORPH_DILATE, SE)
-    opened_closed_br_image = imreconstruct(cv2.bitwise_not(dilated_obr_image), cv2.bitwise_not(img1), radius=5)
+    dilated_obr_image = cv2.morphologyEx(
+        opened_by_reconstruction, cv2.MORPH_DILATE, SE)
+    opened_closed_br_image = imreconstruct(cv2.bitwise_not(
+        dilated_obr_image), cv2.bitwise_not(img1), radius=5)
     opened_closed_br_image = cv2.bitwise_not(opened_closed_br_image)
     SE = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    opening_foreground = cv2.morphologyEx(opened_closed_br_image, cv2.MORPH_OPEN, SE)
-    eroded_foreground = cv2.morphologyEx(opening_foreground, cv2.MORPH_OPEN, SE)
+    opening_foreground = cv2.morphologyEx(
+        opened_closed_br_image, cv2.MORPH_OPEN, SE)
+    eroded_foreground = cv2.morphologyEx(
+        opening_foreground, cv2.MORPH_OPEN, SE)
 
-    #getting sure foreground pixels with simple otsu threshold
-    ret2, th2 = cv2.threshold(eroded_foreground, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # getting sure foreground pixels with simple otsu threshold
+    ret2, th2 = cv2.threshold(eroded_foreground, 0,
+                              255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    #combining the sure foreground with the external markers
-    watershedInput = imposemin(magnitude / 255, cv2.bitwise_or(img5 // 255, th2 // 255))
+    # combining the sure foreground with the external markers
+    watershedInput = imposemin(
+        magnitude / 255, cv2.bitwise_or(img5 // 255, th2 // 255))
 
-    #getting the local maxima with ImageJ algorithm
+    # getting the local maxima with ImageJ algorithm
     ntol = 50  # Noise Tolerance.
     img_data = rgb.copy()
 
@@ -77,7 +87,8 @@ def get_bboxes_alive(img):
     markers_imagej, _ = ndi.label(markers_imagej)
 
     mask = watershed(watershedInput, markers_imagej, mask=th2)
-    return get_bbox_from_mask(mask), mask
+    return get_bbox_from_mask(mask)
+
 
 def get_bbox_from_mask(mask):
     obj_ids = np.unique(mask)
@@ -91,7 +102,7 @@ def get_bbox_from_mask(mask):
 
     maski = np.zeros(shape=masks[0].shape, dtype=np.uint16)
 
-    bbox = {"cell_name": [], "x_min": [],
+    bbox = {"cell_type": [], "x_min": [],
             "y_min": [], "x_max": [], "y_max": []}
     boxes_area = []
     for idx, mask in enumerate(masks):
@@ -104,13 +115,13 @@ def get_bbox_from_mask(mask):
         ymax = np.max(pos[0]) + 2
 
         area = (xmax - xmin) * (ymax - ymin)
-        #threshold were determined from the dataset after a barplot of all areas
+        # threshold were determined from the dataset after a barplot of all areas
         is_large_or_small = not (area < 400 or area > 1500)
         if is_large_or_small and xmin < xmax and ymin < ymax and xmin >= 0 and ymin >= 0 and xmax < mask.shape[
             1] and ymax < \
                 mask.shape[0]:
             boxes.append([xmin, ymin, xmax, ymax])
-            bbox["cell_name"].append("alive")
+            bbox["cell_type"].append("alive")
             bbox["x_min"].append(xmin)
             bbox["y_min"].append(ymin)
             bbox["x_max"].append(xmax)
@@ -122,12 +133,15 @@ def get_bbox_from_mask(mask):
     bboxes = pd.DataFrame(bbox)
 
     bboxes_numpy = bboxes[["x_min", "y_min", "x_max", "y_max"]].to_numpy()
-    bboxes_post_nms = np.asarray(nms(bboxes_numpy, np.ones_like(boxes_area), 0.15)[0])
+    bboxes_post_nms = np.asarray(
+        nms(bboxes_numpy, np.ones_like(boxes_area), 0.15)[0])
 
-    boxes = pd.DataFrame(bboxes_post_nms, columns=["x_min", "y_min", "x_max", "y_max"])
-    boxes['cell_name'] = 'alive'
+    boxes = pd.DataFrame(bboxes_post_nms, columns=[
+                         "x_min", "y_min", "x_max", "y_max"])
+    boxes['cell_type'] = 'alive'
 
-    return boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]]
+    return boxes[["cell_type", "x_min", "y_min", "x_max", "y_max"]]
+
 
 def nms(bounding_boxes, confidence_score, threshold):
     # If no bounding boxes, return empty list
@@ -177,7 +191,8 @@ def nms(bounding_boxes, confidence_score, threshold):
         intersection = w * h
 
         # Compute the ratio between intersection and union
-        ratio = intersection / (areas[index] + areas[order[:-1]] - intersection)
+        ratio = intersection / \
+            (areas[index] + areas[order[:-1]] - intersection)
 
         left = np.where(ratio < threshold)
         order = order[left]
@@ -209,5 +224,3 @@ if __name__ == "__main__":
         bboxes.to_csv(
             str(bbox_output_path/Path(f"{filename}.txt")), sep=' ', header=None, index=None)
         cv2.imwrite(str(mask_output_path / Path(f"{filename}.png")), mask)
-
-
