@@ -1,12 +1,6 @@
 import time
 
 from configs.configs_inst_seg import Configs
-from dataloaders.dataset import (ddsm_dataset_labelled, BaseFetaDataSets, RandomGenerator, ResizeTransform,
-                                 TwoStreamBatchSampler)
-from medpy import metric
-from monai.data.utils import decollate_batch
-from odach_our import oda
-from torch.utils.data import DataLoader
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -91,8 +85,8 @@ with torch.no_grad():
     # test_time_augmentation(configs, tta_model, dead_data_loader, configs.device,
     #                        writer=configs.dead_writer)
 
-    evaluate(configs, 0, cell_pose_test_dataloader, device=configs.device, writer=configs.chrisi_test_writer,
-             vis_every_iter=5)
+    # evaluate(configs, 0, cell_pose_test_dataloader, device=configs.device, writer=configs.chrisi_test_writer,
+    #          vis_every_iter=5)
 
     evaluate(configs, 0, chrisi_test_data_loader, device=configs.device, writer=configs.chrisi_test_writer,
              vis_every_iter=1)
