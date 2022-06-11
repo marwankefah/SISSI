@@ -16,7 +16,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
                  seam_less_clone_k_size=(71, 71),
                  seam_less_blur_sigma=30,
                  blob_detection=True,
-                 dictionary_mapping={'alive': 1, 'inhib': 2, 'dead': 3}):
+                 dictionary_mapping={'alive': 1, 'inhib': 2, 'dead': 3},is_test=False):
         self.root = root
         self.transforms = transforms
         self.split = split
@@ -27,7 +27,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
         self.seam_less_clone_k_size = seam_less_clone_k_size
         self.seam_less_blur_sigma = seam_less_blur_sigma
         self.dictionary_mapping = dictionary_mapping
-
+        self.is_test=is_test
         # load all image files, sorting them to
         # ensure that they are aligned
         # TODO need to be cleaned before publishing (abstract self.root easier)
@@ -80,6 +80,7 @@ class chrisi_dataset(torch.utils.data.Dataset):
             # cell_name =
             boxes = self.sample_list[idx][1]
             img = self.sample_list[idx][0]
+            #Todo add to the sample list
             labels = self.img_labels_path_or_cache[idx]
         else:
             bboxes_path = self.sample_list[idx][1]
@@ -100,8 +101,8 @@ class chrisi_dataset(torch.utils.data.Dataset):
             ymin = int(box[1])
             xmax = int(box[2])
             ymax = int(box[3])
-            if xmin < xmax and ymin < ymax and xmin >= 0 and ymin >= 0 and xmax < img.shape[
-                1] and ymax < img.shape[0]:
+            if self.is_test or (xmin < xmax and ymin < ymax and xmin >= 0 and ymin >= 0 and xmax < img.shape[
+                1] and ymax < img.shape[0]):
                 boxes_post_process.append(box)
                 labels_post_process.append(label)
                 img_mask[ymin:ymax, xmin:xmax, :] = 1

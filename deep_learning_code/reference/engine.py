@@ -1,14 +1,7 @@
 import math
 import sys
-import time
 import random
-from typing import Tuple, List, Dict, Optional
-import torch
-from torch import Tensor
-from collections import OrderedDict
-from torchvision.models.detection.roi_heads import fastrcnn_loss
 from odach_our import oda
-from torchvision.models.detection.rpn import concat_box_prediction_layers
 import cv2
 import torch
 import numpy as np
@@ -17,13 +10,13 @@ from reference.coco_utils import get_coco_api_from_dataset
 from reference.coco_eval import CocoEvaluator
 import reference.utils as utils
 from collections import Counter
+from torchvision.ops import boxes as box_ops
 
 from reference.preprocess import mask_overlay
 
 category_ids = [1]
 # We will use the mapping from category_id to the class name
 # to visualize the class label for the bounding box on the image
-
 category_id_to_name = {1: 'alive', 2: 'inhib', 3: 'dead'}
 
 
@@ -151,11 +144,7 @@ def train_one_iter(configs, iter_epoch, epoch, images, targets, writer):
     losses.backward()
     configs.optimizer.step()
 
-    # TODO check it make the functionality required
-    # outputs_list_dict.append({target["image_id"].item(): output for target, output in zip(targets, outputs)})
-
     if iter_epoch % 20 == 0:
-        # (epoch+1)*iter_epoch
         output_vis_to_tensorboard(images, targets, outputs, (iter_epoch + epoch * 200), writer, configs.train_mask)
     return loss_dict_reduced, loss_value
 
@@ -171,7 +160,7 @@ def _get_iou_types(model, has_mask):
 
 
 @torch.no_grad()
-def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20, use_tta=False):
+def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20, use_tta=False, return_metrics=False):
     n_threads = torch.get_num_threads()
     # FIXME (i need someone to fix me ) remove this and make paste_masks_in_image run on the GPU
     torch.set_num_threads(1)
@@ -206,7 +195,6 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20, use
             loss_dict, outputs = model(images, targets1)
 
         if iter_per_epoch % vis_every_iter == 0:
-            # (epoch+1)*iter_epoch
             output_vis_to_tensorboard(images, targets1, outputs, (iter_per_epoch + epoch * 200), writer,
                                       configs.train_mask)
             logging.info('Evaluation [{}/{}] '.format(iter_per_epoch, total_iter_per_epoch))
@@ -228,7 +216,6 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20, use
         val_loss_dict = Counter(val_loss_dict) + Counter(loss_dict_reduced)
 
     # gather the stats from all processes
-
     coco_evaluator.synchronize_between_processes()
 
     # accumulate predictions from all images
@@ -257,7 +244,10 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20, use
                                                         val_losses_reduced) + "\t".join(loss_str))
 
     torch.set_num_threads(n_threads)
-    return coco_evaluator.coco_eval['bbox'].stats[1], outputs_list_dict
+    if return_metrics:
+        return coco_evaluator.coco_eval['bbox']
+
+    return coco_evaluator.coco_eval['bbox'].stats[1], outputs_list_dict, val_losses_reduced
 
 
 def test(configs, epoch, data_loader, device, writer):
@@ -278,7 +268,6 @@ def test(configs, epoch, data_loader, device, writer):
             loss_dict, outputs = configs.model(images)
 
         if iter_per_epoch % 10 == 0:
-            # (epoch+1)*iter_epoch
             output_vis_to_tensorboard(images, targets1, outputs, (iter_per_epoch + epoch * 200), writer,
                                       configs.train_mask)
 
@@ -384,7 +373,6 @@ def coco_evaluate(outputs_list_dict, coco, epoch, writer, train_mask=False):
 
     for res in outputs_list_dict:
         # torch.cuda.synchronize()
-        # make it faster
         coco_evaluator.update(res)
 
     # gather the stats from all processes
@@ -407,17 +395,8 @@ def coco_evaluate(outputs_list_dict, coco, epoch, writer, train_mask=False):
     return coco_evaluator.coco_eval['bbox'].stats[1]
 
 
-from torchvision.ops import boxes as box_ops
-
-
 def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_num, max_epoch):
     if configs.label_correction:
-        # if the flag is false, then check every time if it needs label correction
-        # if it is true one time, it will always be true
-        if not configs.need_label_correction:
-            configs.need_label_correction = utils.if_update(configs.train_iou_values, epoch_num, n_epoch=max_epoch,
-                                                            threshold=configs.label_correction_threshold)
-
         # it needs label correction, then output the label correction in a folder and reload it again
         # no large cache memory
         if configs.need_label_correction:
@@ -437,7 +416,7 @@ def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_
                     boxes, scores, labels = boxes[keep], scores[keep], labels[keep]
                     #
                     # non-maximum suppression, independently done per class
-                    keep = box_ops.batched_nms(boxes, scores, labels, 0.3)
+                    keep = box_ops.batched_nms(boxes, scores, labels, 0.2)
                     # keep only topk scoring predictions
                     keep = keep[: 200]
                     boxes, scores, labels = boxes[keep], scores[keep], labels[keep]
@@ -458,20 +437,75 @@ def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_
                     else:
                         logging.info('image with id {} have no output'.format(idx))
 
+        # if the flag is false, then check every time if it needs label correction
+        # if it is true one time, it will always be true
+        else:
+            configs.need_label_correction = utils.if_update(configs.train_iou_values, epoch_num, n_epoch=max_epoch,
+                                                            threshold=configs.label_correction_threshold)
+
 
 import os
+import pandas as pd
 
 
-def save_check_point(configs, epoch_num, AP_50_all, snapshot_path):
+def output_data_set_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, output_folder):
+    for train_batch_output_dict in outputs_list_dict:
+        for idx, model_single_output in train_batch_output_dict.items():
+            # remove low scoring boxes
+            boxes = model_single_output['boxes']
+            scores = model_single_output['scores']
+            labels = model_single_output['labels']
+            inds = torch.where(scores >= configs.label_corr_score_thresh)[0]
+            boxes, scores, labels = boxes[inds], scores[inds], labels[inds]
+
+            # # remove empty boxes
+            keep = box_ops.remove_small_boxes(boxes, min_size=1e-2)
+            boxes, scores, labels = boxes[keep], scores[keep], labels[keep]
+            #
+            # non-maximum suppression, independently done per class
+            keep = box_ops.batched_nms(boxes, scores, labels, 0.2)
+            # keep only topk scoring predictions
+            keep = keep[: 200]
+            boxes, scores, labels = boxes[keep], scores[keep], labels[keep]
+
+            y_scale = (model_single_output['image_size'][0] - 1) / configs.patch_size[0]
+            x_scale = (model_single_output['image_size'][1] - 1) / configs.patch_size[1]
+            xmin, ymin, xmax, ymax = boxes.unbind(1)
+
+            xmin = xmin * x_scale
+            xmax = xmax * x_scale
+            ymin = ymin * y_scale
+            ymax = ymax * y_scale
+
+            # TODO cast as int
+            boxes = torch.stack((xmin, ymin, xmax, ymax), dim=1).type(torch.int32)
+
+            cell_type_name = weak_label_chrisi_dataset.images_path[idx].split('\\')
+            filename = cell_type_name[1].split(".")[0]
+
+            if torch.numel(boxes) != 0:
+                boxes_list = boxes.tolist()
+                boxes = pd.DataFrame(boxes_list, columns=["x_min", "y_min", "x_max", "y_max"])
+                boxes['cell_name'] = cell_type_name[0]
+                boxes[["cell_name", "x_min", "y_min", "x_max", "y_max"]].to_csv(
+                    os.path.join(output_folder, f"{filename}.txt"), sep=' ', header=None, index=None)
+
+            else:
+                # TODO open empty .txt file
+                logging.info('image with id {} have no output'.format(idx))
+                open(os.path.join(output_folder, f"{filename}.txt"), 'a').close()
+
+
+def save_check_point(configs, epoch_num, perforamnce, snapshot_path):
     save_mode_path = os.path.join(snapshot_path,
-                                  'epoch_{}_val_AP_50_all_{}.pth'.format(
-                                      epoch_num, round(AP_50_all, 4)))
-    logging.info('saving model with best performance {}'.format(AP_50_all))
+                                  'epoch_{}_perforamnce_{}.pth'.format(
+                                      epoch_num, round(float(perforamnce.detach().cpu().numpy()), 4)))
+    logging.info('saving model with best performance {}'.format(perforamnce))
     utils.save_on_master({
         'model': configs.model.state_dict(),
         'optimizer': configs.optimizer.state_dict(),
         'lr_scheduler': configs.lr_scheduler.state_dict(),
         'epoch': epoch_num,
-        'best_performance': AP_50_all,
+        'best_performance': perforamnce,
         'train_iou_values': configs.train_iou_values,
         'need_label_correction': configs.need_label_correction}, save_mode_path)

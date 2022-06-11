@@ -19,15 +19,6 @@ import torch
 import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from configs.configs import *
-from dataloaders.dataset import (ddsm_dataset_labelled, BaseFetaDataSets, RandomGenerator, ResizeTransform,
-                                 TwoStreamBatchSampler)
-import odach as oda
-from torchvision.ops import boxes as box_ops
-from configs.configs import Configs
-from monai.visualize import plot_2d_or_3d_image
-from medpy import metric
-from PIL import ImageFile
 
 from configs.configs_inst_seg import Configs
 
@@ -53,26 +44,17 @@ def train(configs, snapshot_path):
 
     configs.model.to(configs.device)
 
-    # db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
-    # db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
-
     db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
 
-    db_chrisi_alive = chrisi_dataset(configs.chrisi_cells_root_path, ['alive'], configs.val_detections_transforms,
-                                     cache_labels=True)
-    db_chrisi_dead = chrisi_dataset(configs.chrisi_cells_root_path, ['dead'], configs.val_detections_transforms,
-                                    cache_labels=True )
-    # db_chrisi_inhib = chrisi_dataset(configs.chrisi_cells_root_path, 'inhib', configs.train_detections_transforms)
-
     db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
-                                    configs.val_detections_transforms,cache_labels=True)
+                                    configs.val_detections_transforms, cache_labels=True)
 
-    weak_label_chrisi_dataset = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead','inhib'],
+    weak_label_chrisi_dataset = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead', 'inhib'],
                                                configs.train_detections_transforms,
-                                               cache_labels=True,need_seam_less_clone=configs.need_seam_less_clone)
+                                               cache_labels=True, need_seam_less_clone=configs.need_seam_less_clone)
 
-    weak_label_chrisi_dataset_val = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead','inhib'],
+    weak_label_chrisi_dataset_val = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead', 'inhib'],
                                                    configs.val_detections_transforms,
                                                    cache_labels=True)
 
@@ -93,16 +75,6 @@ def train(configs, snapshot_path):
         num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
-    db_chrisi_alive.sample_list = random.sample(db_chrisi_alive.sample_list, 20)
-    db_chrisi_dead.sample_list = random.sample(db_chrisi_dead.sample_list, 20)
-
-    chrisi_alive_data_loader = torch.utils.data.DataLoader(
-        db_chrisi_alive, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
-        collate_fn=utils.collate_fn)
-
-    chrisi_dead_data_loader = torch.utils.data.DataLoader(
-        db_chrisi_dead, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
-        collate_fn=utils.collate_fn)
 
     chrisi_test_data_loader = torch.utils.data.DataLoader(
         db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
@@ -122,34 +94,24 @@ def train(configs, snapshot_path):
 
     for epoch_num in iterator:
 
-        # train_iou, outputs_list_dict = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
-        #                                         configs.val_writer,
-        #                                         vis_every_iter=20)
-
-        train_iou, outputs_list_dict = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
+        train_iou, outputs_list_dict,_ = evaluate(configs, epoch_num, initial_weak_labels_data_loader, configs.device,
                                                 configs.val_writer,
-                                                vis_every_iter=5, use_tta=True)
+                                                vis_every_iter=5, use_tta=configs.need_label_correction)
+        configs.train_iou_values.append(train_iou)
 
-        # evaluate(configs, epoch_num, chrisi_alive_data_loader, configs.device,
-        #          configs.alive_writer, use_tta=True,
-        #          vis_every_iter=5)
-        #
-        # evaluate(configs, epoch_num, chrisi_dead_data_loader, configs.device,
-        #          configs.dead_writer, use_tta=True,
-        #          vis_every_iter=5)
-
-        evaluate(configs, epoch_num, cell_pose_test_dataloader, device=configs.device,
-                 writer=configs.cell_pose_test_writer)
+        _, _, val_losses_reduced = evaluate(configs, epoch_num, cell_pose_test_dataloader, device=configs.device,
+                                            writer=configs.cell_pose_test_writer)
 
         # evaluate chrisi testset
-        AP_50_all, _ = evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
-                                vis_every_iter=1)
+        evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device,
+                                   configs.chrisi_test_writer,
+                                   vis_every_iter=1)
 
-        _, _ = evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device,
+        evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device,
                         configs.chrisi_test_writer_tta,
                         vis_every_iter=1, use_tta=True)
 
-        save_check_point(configs, epoch_num, AP_50_all, snapshot_path)
+        save_check_point(configs, epoch_num, val_losses_reduced, snapshot_path)
 
         correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_num, max_epoch)
 
@@ -161,9 +123,8 @@ def train(configs, snapshot_path):
         train_mixed_one_epoch(configs, cell_pose_train_dataloader, weak_label_chrisi_dataloader, epoch_num, 20,
                               configs.train_writer)
 
-        configs.lr_scheduler.step(AP_50_all)
+        configs.lr_scheduler.step(val_losses_reduced)
 
-        # configs.train_iou_values.append(train_iou)
 
         if iter_num >= configs.max_iterations:
             break

@@ -2,6 +2,5 @@
 /.idea/
 /__pycache__/
 /utils/foreground_seg/
-/data/cropped/inhib/inhib/
-/data/cropped/alive/alive/
-/data/cropped/dead/dead/
+/deep_learning_code/test_csv.py
+/deep_learning_code/output_DL_pred.py
