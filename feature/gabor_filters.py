@@ -102,12 +102,12 @@ if __name__ == "__main__":
     cifar_path = Path("data/cifar")
 
     dead_trainloader = loadData(
-        str(dead_path), train_transforms, batchsize=5000)
+        str(dead_path), train_transforms, batchsize=3500)
     alive_trainloader = loadData(
-        str(alive_path), train_transforms, batchsize=5000)
+        str(alive_path), train_transforms, batchsize=3500)
     inhib_trainloader = loadData(
-        str(inhib_path), train_transforms, batchsize=5000)
-    cifarloader = loadcifar(str(cifar_path), train_transforms, batchsize=15000)
+        str(inhib_path), train_transforms, batchsize=3500)
+    cifarloader = loadcifar(str(cifar_path), train_transforms, batchsize=10500)
 
     deaditer = iter(dead_trainloader)
     aliveiter = iter(alive_trainloader)
@@ -118,16 +118,16 @@ if __name__ == "__main__":
     images_alive, labels_alive = aliveiter.next()
     images_inhib, labels_inhib = inhibiter.next()
     images_cifar, labels_cifar = cifariter.next()
-    X1 = torch.concat((images_dead[0:4000], images_alive[0:4000],
-                       images_inhib[0:4000], images_cifar[0:12000])).reshape(-1, 22, 22)
-    Y1 = np.ones((24000, 1))
-    Y1[12000::] = 0
+    X1 = torch.concat((images_dead[0:3000], images_alive[0:3000],
+                       images_inhib[0:3000], images_cifar[0:9000])).reshape(-1, 22, 22)
+    Y1 = np.ones((18000, 1))
+    Y1[9000::] = 0
     X1 = X1.unsqueeze(1)
 
-    X2 = torch.concat((images_dead[4000::], images_alive[4000::],
-                       images_inhib[4000::], images_cifar[12000::])).reshape(-1, 22, 22)
-    Y2 = np.ones((6000, 1))
-    Y2[3000::] = 0
+    X2 = torch.concat((images_dead[3000::], images_alive[3000::],
+                       images_inhib[3000::], images_cifar[9000::])).reshape(-1, 22, 22)
+    Y2 = np.ones((3000, 1))
+    Y2[1500::] = 0
     X2 = X2.unsqueeze(1)
 
     real, imag = build_filters()
@@ -152,4 +152,4 @@ if __name__ == "__main__":
     col = {"x": a}
     df = pd.DataFrame(col)
     df.insert(0, "x", a, True)
-    df.to_csv("feature/output/gabor_index.csv")
+    df.to_csv("gabor_index.csv")

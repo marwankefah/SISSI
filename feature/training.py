@@ -1,9 +1,6 @@
-import feature.Classifier as cl
 import feature.helper as hf
 import torch
 from pathlib import Path
-from torch import nn
-from sklearn.svm import SVC
 from sklearn.metrics import roc_auc_score, classification_report
 from sklearn.preprocessing import label_binarize
 from sklearn.neural_network import MLPClassifier
@@ -14,7 +11,7 @@ train_transforms = hf.defineTransforms()
 
 # Path To Dataset
 data_path = Path("data/cropped")
-feat_path = Path("feature/output/gabor_index.csv")
+feat_path = Path("output/gabor_index.csv")
 modelpath = Path("model/checkpoint.pth")
 
 
@@ -69,7 +66,7 @@ for train_images, train_labels in trainloader:
         train_labels, pred))
     print(classification_report(train_labels, pred))
 
-breakpoint()
+
 for images, labels in testloader:
     images = images.numpy()
     labels = labels.numpy()
