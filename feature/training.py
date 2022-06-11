@@ -1,9 +1,6 @@
-import feature.Classifier as cl
 import feature.helper as hf
 import torch
 from pathlib import Path
-from torch import nn
-from sklearn.svm import SVC
 from sklearn.metrics import roc_auc_score, classification_report
 from sklearn.preprocessing import label_binarize
 from sklearn.neural_network import MLPClassifier
@@ -12,27 +9,28 @@ from settings import model_path
 import pandas as pd
 
 train_transforms = hf.defineTransforms()
-
+test_transforms = hf.defineTransformstest()
 # Path To Dataset
 data_path = Path("data/cropped")
-feat_path = Path("feature/output/gabor_index.csv")
+test_path = Path("data/cropped_test/3/")
+feat_path = Path("gabor_index.csv")
 modelpath = Path("model/checkpoint.pth")
-
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
 trainloader, testloader = hf.getProcessedData(
-    data_path, feat_path, 21000, 5000, transform=train_transforms)
+    data_path, feat_path, 15000, 15000, transform=train_transforms)
+
+gold_standard_test_loader = hf.getProcessedDataTest(
+    test_path, feat_path, 1000, transform=test_transforms)
 
 
 def roc_auc_score_multiclass(actual_class, pred_class, average="macro"):
-
     # creating a set of all the unique classes using the actual class list
     unique_class = set(actual_class)
     roc_auc_dict = {}
     for per_class in unique_class:
-
         # creating a list of all the classes except the current class
         other_class = [x for x in unique_class if x != per_class]
 
@@ -48,10 +46,10 @@ def roc_auc_score_multiclass(actual_class, pred_class, average="macro"):
     return roc_auc_dict
 
 
-batch_size = 128
+batch_size = 256
 max_epoch = 100
-max_iter = int(30000/batch_size*max_epoch)
-n_iter_no_change = 20
+max_iter = int(30000 / batch_size * max_epoch)
+n_iter_no_change = 50
 
 for train_images, train_labels in trainloader:
     train_images = train_images.numpy()
@@ -59,8 +57,8 @@ for train_images, train_labels in trainloader:
     # model = SVC(probability=True)
 
     model = MLPClassifier(solver='adam', alpha=1e-5,
-                          hidden_layer_sizes=(256, 128, 64),
-                          learning_rate_init=0.0003, random_state=1,
+                          hidden_layer_sizes=(64, 128, 256, 128, 64),
+                          learning_rate_init=0.0001, random_state=1,
                           batch_size=128, verbose=True, max_iter=max_iter,
                           early_stopping=True, n_iter_no_change=n_iter_no_change)
 
@@ -70,23 +68,35 @@ for train_images, train_labels in trainloader:
         train_labels, pred)
     train_metrics = pd.DataFrame(classification_report(
         train_labels, pred, output_dict=True)).reset_index()
-    train_metrics.loc[train_metrics.shape[0]] = ["ROC", train_auc[0], roc_auc_score_multiclass(
-        train_labels, pred)[1], roc_auc_score_multiclass(
-        train_labels, pred)[2], "", "", ""]
+    train_metrics.loc[train_metrics.shape[0]] = [
+        "ROC", train_auc[0], train_auc[1], train_auc[2], "", "", ""]
     print(train_metrics)
     train_metrics.to_csv("data/output/train_metrics.csv")
 
 for images, labels in testloader:
     images = images.numpy()
     labels = labels.numpy()
-    test_pred = model.predict(images)
+    val_pred = model.predict(images)
     val_auc = roc_auc_score_multiclass(
-        labels, test_pred)
-    test_metrics = classification_report(labels, test_pred, output_dict=True)
-    test_metrics = pd.DataFrame(test_metrics).reset_index()
-    test_metrics.loc[test_metrics.shape[0]] = [
+        labels, val_pred)
+    val_metrics = pd.DataFrame(classification_report(
+        labels, val_pred, output_dict=True)).reset_index()
+    val_metrics.loc[val_metrics.shape[0]] = [
         "ROC", val_auc[0], val_auc[1], val_auc[2], "", "", ""]
+    print(val_metrics)
+    val_metrics.to_csv("data/output/val_metrics.csv")
+
+for images, labels in gold_standard_test_loader:
+    images = images.numpy()
+    labels = labels.numpy()
+    test_pred = model.predict(images)
+    test_auc = roc_auc_score_multiclass(labels, test_pred)
+    test_metrics = pd.DataFrame(classification_report(
+        labels, test_pred, output_dict=True)).reset_index()
+    test_metrics.loc[test_metrics.shape[0]] = [
+        "ROC", test_auc[0], test_auc[1], test_auc[2], "", "", ""]
     print(test_metrics)
-    train_metrics.to_csv("data/output/val_metrics.csv")
+    test_metrics.to_csv("data/output/test_metrics.csv")
+
     fileObject = open(model_path, 'wb')
     pkl.dump(model, fileObject)
