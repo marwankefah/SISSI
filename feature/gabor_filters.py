@@ -135,7 +135,7 @@ if __name__ == "__main__":
     X_feat1 = gaborvector(X1, real, imag)
     X_feat2 = gaborvector(X2, real, imag)
 
-    ada = Ada.AdaBoostSelection(200)
+    ada = Ada.AdaBoostSelection(1000)
 
     ada.fit(X_feat1.numpy(), Y1)
 
@@ -152,4 +152,4 @@ if __name__ == "__main__":
     col = {"x": a}
     df = pd.DataFrame(col)
     df.insert(0, "x", a, True)
-    df.to_csv("gabor_index.csv")
+    df.to_csv("gabor_index_1000.csv")
