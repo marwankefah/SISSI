@@ -2,3 +2,6 @@
 /.idea/
 /__pycache__/
 /utils/foreground_seg/
+/data/cropped/inhib/inhib/
+/data/cropped/alive/alive/
+/data/cropped/dead/dead/
