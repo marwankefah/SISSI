@@ -118,7 +118,6 @@ if __name__ == "__main__":
     images_alive, labels_alive = aliveiter.next()
     images_inhib, labels_inhib = inhibiter.next()
     images_cifar, labels_cifar = cifariter.next()
-    breakpoint()
     X1 = torch.concat((images_dead[0:4000], images_alive[0:4000],
                        images_inhib[0:4000], images_cifar[0:12000])).reshape(-1, 22, 22)
     Y1 = np.ones((24000, 1))

@@ -69,6 +69,7 @@ for train_images, train_labels in trainloader:
         train_labels, pred))
     print(classification_report(train_labels, pred))
 
+breakpoint()
 for images, labels in testloader:
     images = images.numpy()
     labels = labels.numpy()

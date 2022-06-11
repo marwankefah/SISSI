@@ -47,9 +47,13 @@ def get_all_cells(image_dir, bbox_dir):
 
 def extract_features(save=True):
     all_cells_raw = get_all_cells(
-        image_dir=Path("raw/named_images_split"),
+        image_dir=Path("raw/deadplusaliveplusinhib"),
         bbox_dir=Path("data/output/bbox"))
-    [cv2.imwrite(str(Path("data/cropped") / Path(cell[2]) / Path(cell[2]) / Path(f"{cell[0]}_{cell[1]}_{cell[2]}.png")), cell[3])
+    cropped_dir = Path("data/cropped")
+    cropped_dir.mkdir(exist_ok=True)
+
+    breakpoint()
+    [cv2.imwrite(str(cropped_dir / Path(cell[2]) / Path(cell[2]) / Path(f"{cell[0]}_{cell[1]}_{cell[2]}.png")), cell[3])
      for cell in all_cells_raw]
     feature_dfs = []
     print("Extracting features")

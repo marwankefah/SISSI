@@ -34,11 +34,11 @@ def load_balanced_data(path, transforms, train_batchsize=10000, test_batchsize=4
     inhib_path = path/Path("inhib")
 
     dead_trainloader = loadData(
-        str(dead_path), transforms, batchsize=7000)
+        str(dead_path), transforms, batchsize=5000)
     alive_trainloader = loadData(
-        str(alive_path), transforms, batchsize=7000)
+        str(alive_path), transforms, batchsize=5000)
     inhib_trainloader = loadData(
-        str(inhib_path), transforms, batchsize=7000)
+        str(inhib_path), transforms, batchsize=5000)
 
     deaditer = iter(dead_trainloader)
     aliveiter = iter(alive_trainloader)
@@ -47,10 +47,10 @@ def load_balanced_data(path, transforms, train_batchsize=10000, test_batchsize=4
     images_dead, labels_dead = deaditer.next()
     images_alive, labels_alive = aliveiter.next()
     images_inhib, labels_inhib = inhibiter.next()
-    X = torch.concat((images_dead[0:7000], images_alive[0:7000],
-                      images_inhib[0:7000]))
-    y = torch.concat((labels_dead[0:7000], labels_alive[0:7000]+1,
-                      labels_inhib[0:7000]+2))
+    X = torch.concat((images_dead[0:5000], images_alive[0:5000],
+                      images_inhib[0:5000]))
+    y = torch.concat((labels_dead[0:5000], labels_alive[0:5000]+1,
+                      labels_inhib[0:5000]+2))
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.3, random_state=42)
