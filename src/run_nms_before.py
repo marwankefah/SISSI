@@ -3,7 +3,7 @@ from feature.gabor_filters import gaborvector
 from inhib_cells.inhib_cells_bboxes import get_bboxes_inhib
 from alive_cells.alive_cells_bboxes import get_bboxes_alive
 from feature.extract_features import crop_w_bboxes
-from settings import model_path, data_dir
+from settings import model_path, data_dir,feature_path,deep_learning_out_dir,image_dir
 import pickle as pkl
 from pathlib import Path
 import cv2
@@ -243,15 +243,12 @@ def pipeline_dl(image, gabor_filter, bbox_path):
 
 if __name__ == "__main__":
     real, imag = hf.build_filters()
-    feature_path = Path("../feature/intersect_gabor_1.csv")
     feature_df = pd.read_csv(feature_path)
-    image_dir = data_dir / Path("test_labelled")
-    deep_learning_out_dir = data_dir / Path(
-        "weak_labels_reduced_nms/deep_learning_output/deep_learning_output_MB_ST_SH/test_labelled/")
+
     for img in image_dir.rglob("*"):
         if ".jpg" in str(img):
             image_path = img
             bbox_path = deep_learning_out_dir / Path(img.stem + '.txt')
             image = cv2.imread(str(image_path))
-            pipeline(image, (real, imag), feature_df)
+            # pipeline(image, (real, imag), feature_df)
             # pipeline_dl(image, (real, imag), bbox_path=bbox_path)
