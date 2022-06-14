@@ -240,7 +240,7 @@ def pipeline(image, gabor_filter, feature_df):
             "inhib": sum(boxes_final["pred"] == 2)}
 
 
-def pipeline_dl(image, gabor_filter, bbox_path):
+def pipeline_dl(image, gabor_filter, bbox_path, feature_df):
     bboxes_df = pd.read_csv(bbox_path, delimiter=' ', names=[
                             "cell_type", "x_min", "y_min", "x_max", "y_max"])
     cropped = crop_w_bboxes(image=image, bboxes=bboxes_df)
@@ -316,7 +316,8 @@ if __name__ == "__main__":
             # print(bbox_gt)
 
             ip_counts = pipeline(image, (real, imag), feature_df)
-            dl_counts = pipeline_dl(image, (real, imag), bbox_path=bbox_path)
+            dl_counts = pipeline_dl(
+                image, (real, imag), bbox_path=bbox_path, feature_df=feature_df)
             gt_counts_1 = get_gt_count(bbox_gt_1)
             gt_counts_2 = get_gt_count(bbox_gt_2)
             gt_counts_3 = get_gt_count(bbox_gt_3)
