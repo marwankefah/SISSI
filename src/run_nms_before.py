@@ -3,7 +3,7 @@ from feature.gabor_filters import gaborvector
 from inhib_cells.inhib_cells_bboxes import get_bboxes_inhib
 from alive_cells.alive_cells_bboxes import get_bboxes_alive
 from feature.extract_features import crop_w_bboxes
-from settings import model_path, data_dir,feature_path,deep_learning_out_dir,image_dir
+from settings import model_path, data_dir, feature_path, deep_learning_out_dir, image_dir
 import pickle as pkl
 from pathlib import Path
 import cv2
@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 from deep_learning_code.odach_our import nms, weighted_boxes_fusion
 # from deep_learning_code.torchvision_our.ops import batched_nms
 from torchvision.ops import batched_nms
+import warnings
+from sklearn.metrics import roc_auc_score, classification_report
 
 # from deep_learning_code.reference.engine import visualize
 
@@ -89,13 +91,36 @@ def visualize(image, bboxes, scores, category_ids, category_id_to_name):
     return img
 
 
+def cytotox(dead_count, alive_count, inhib_count):
+
+    total_count = dead_count + inhib_count + alive_count
+
+    # if less than 5 percent of total cells are dead
+    if(total_count/100*5 > dead_count):
+        # all alive
+        return "none"
+    if(total_count/100*20 > dead_count):
+        # less than 20% round
+        return "slight"
+    elif(total_count/100*50 > dead_count):
+        # less than 50% round
+        return "mild"
+    elif(total_count/100*70 > dead_count):
+        # less than 70% round
+        return "moderate"
+    else:
+        # more
+        return "severe"
+
+
 def pipeline(image, gabor_filter, feature_df):
     bboxes_df = get_bboxes_df(image)
 
     bboxes_all = bboxes_df["bboxes_dead"].values.tolist() + bboxes_df["bboxes_alive"].values.tolist() + bboxes_df[
         "bboxes_inhib"].values.tolist()
 
-    bboxes_all_df = pd.DataFrame(bboxes_all, columns=['cell_type', 'x_min', 'y_min', 'x_max', 'y_max'])
+    bboxes_all_df = pd.DataFrame(
+        bboxes_all, columns=['cell_type', 'x_min', 'y_min', 'x_max', 'y_max'])
 
     def nms(bounding_boxes, confidence_score, threshold):
         # If no bounding boxes, return empty list
@@ -146,7 +171,7 @@ def pipeline(image, gabor_filter, feature_df):
 
             # Compute the ratio between intersection and union
             ratio = intersection / \
-                    (areas[index] + areas[order[:-1]] - intersection)
+                (areas[index] + areas[order[:-1]] - intersection)
 
             left = np.where(ratio < threshold)
             order = order[left]
@@ -154,7 +179,8 @@ def pipeline(image, gabor_filter, feature_df):
         return picked_boxes, picked_score
 
     bboxes_post_nms = \
-    nms(bboxes_all_df[['x_min', 'y_min', 'x_max', 'y_max']].to_numpy(), np.ones((len(bboxes_all_df))), 0.1)[0]
+        nms(bboxes_all_df[['x_min', 'y_min', 'x_max', 'y_max']
+                          ].to_numpy(), np.ones((len(bboxes_all_df))), 0.1)[0]
     boxes_final = pd.DataFrame(bboxes_post_nms, columns=[
         "x_min", "y_min", "x_max", "y_max"])
     boxes_final['cell_type'] = 'anyth'
@@ -176,11 +202,9 @@ def pipeline(image, gabor_filter, feature_df):
 
     pr_all = model.predict_proba(all_feat)
 
-
-
     selected_bboxes = [np.array(bboxes_post_nms).astype(float)]
-    selected_pr = [np.max(pr_all,axis=1)]
-    selected_label = [np.argmax(pr_all,axis=1)]
+    selected_pr = [np.max(pr_all, axis=1)]
+    selected_label = [np.argmax(pr_all, axis=1)]
     # keep = nms(
     #     torch.from_numpy(selected_bboxes).float(), torch.from_numpy(
     #         selected_pr), torch.from_numpy(selected_label).float(), 0.2)
@@ -205,14 +229,20 @@ def pipeline(image, gabor_filter, feature_df):
     selected_bboxes[:, 3] *= image.shape[0]
     out_img = visualize(image, selected_bboxes, selected_pr,
                         selected_label, category_id_to_name={
-            1: 'alive', 2: 'inhib', 0: 'dead'})
-    plt.title("Image processing output")
-    plt.imshow(out_img)
-    plt.show()
+                            1: 'alive', 2: 'inhib', 0: 'dead'})
+    # plt.title("Image processing output")
+    # plt.imshow(out_img)
+    # plt.show()
+
+    boxes_final["pred"] = selected_label
+    return {"dead": sum(boxes_final["pred"] == 0),
+            "alive": sum(boxes_final["pred"] == 1),
+            "inhib": sum(boxes_final["pred"] == 2)}
 
 
 def pipeline_dl(image, gabor_filter, bbox_path):
-    bboxes_df = pd.read_csv(bbox_path, delimiter=' ', names=["cell_type", "x_min", "y_min", "x_max", "y_max"])
+    bboxes_df = pd.read_csv(bbox_path, delimiter=' ', names=[
+                            "cell_type", "x_min", "y_min", "x_max", "y_max"])
     cropped = crop_w_bboxes(image=image, bboxes=bboxes_df)
 
     cropped_images = [cropped[i][2]
@@ -232,23 +262,126 @@ def pipeline_dl(image, gabor_filter, bbox_path):
     pred_pr = model.predict_proba(feat)
 
     bboxes_numpy = bboxes_df[["x_min", "y_min", "x_max", "y_max"]].to_numpy()
+    bboxes_df["pred"] = pred_labels
 
     out_img = visualize(image, bboxes_numpy, np.max(pred_pr, axis=1).tolist(),
                         pred_labels.tolist(), category_id_to_name={
-            1: 'alive', 2: 'inhib', 0: 'dead'})
+        1: 'alive', 2: 'inhib', 0: 'dead'})
     plt.title("Deep learning output")
     plt.imshow(out_img)
     plt.show()
+    return {"dead": sum(bboxes_df["pred"] == 0),
+            "alive": sum(bboxes_df["pred"] == 1),
+            "inhib": sum(bboxes_df["pred"] == 2)}
+
+
+def get_gt_count(boxes_gt):
+    return {"dead": sum(boxes_gt["cell_type"] == "dead"),
+            "alive": sum(boxes_gt["cell_type"] == "alive"),
+            "inhib": sum(boxes_gt["cell_type"] == "inhib")}
 
 
 if __name__ == "__main__":
     real, imag = hf.build_filters()
     feature_df = pd.read_csv(feature_path)
 
+    gt_cytotoxicity_1 = []
+    gt_cytotoxicity_2 = []
+    gt_cytotoxicity_3 = []
+    gt_cytotoxicity_union = []
+
+    ip_pred_cytotoxicity = []
+    dl_pred_cytotoxicity = []
+
     for img in image_dir.rglob("*"):
         if ".jpg" in str(img):
             image_path = img
             bbox_path = deep_learning_out_dir / Path(img.stem + '.txt')
             image = cv2.imread(str(image_path))
-            # pipeline(image, (real, imag), feature_df)
-            # pipeline_dl(image, (real, imag), bbox_path=bbox_path)
+            bbox_gt_3 = pd.read_csv(Path("data/chrisi/test_labelled_3") /
+                                    Path(f'{img.stem}.txt'), delimiter=' ', names=[
+                "cell_type", "x_min", "y_min", "x_max", "y_max"])
+
+            bbox_gt_1 = pd.read_csv(Path("data/chrisi/test_labelled_1/test_labelled_1") /
+                                    Path(f'{img.stem}.txt'), delimiter=' ', names=[
+                "cell_type", "x_min", "y_min", "x_max", "y_max"])
+            bbox_gt_2 = pd.read_csv(Path("data/chrisi/test_labelled_1/test_labelled_2") /
+                                    Path(f'{img.stem}.txt'), delimiter=' ', names=[
+                "cell_type", "x_min", "y_min", "x_max", "y_max"])
+            bbox_gt_union = pd.read_csv(Path("data/chrisi/test_labelled_1/test_labelled_union") /
+                                        Path(f'{img.stem}.txt'), delimiter=' ', names=[
+                "cell_type", "x_min", "y_min", "x_max", "y_max"])
+
+            warnings.filterwarnings("ignore")
+            # print(bbox_gt)
+
+            ip_counts = pipeline(image, (real, imag), feature_df)
+            dl_counts = pipeline_dl(image, (real, imag), bbox_path=bbox_path)
+            gt_counts_1 = get_gt_count(bbox_gt_1)
+            gt_counts_2 = get_gt_count(bbox_gt_2)
+            gt_counts_3 = get_gt_count(bbox_gt_3)
+            gt_counts_union = get_gt_count(bbox_gt_union)
+
+            print(img.stem)
+
+            gt_cytotoxicity_1.append(cytotox(gt_counts_1["dead"],
+                                             gt_counts_1["alive"], gt_counts_1["inhib"]))
+
+            gt_cytotoxicity_2.append(cytotox(gt_counts_2["dead"],
+                                             gt_counts_2["alive"], gt_counts_2["inhib"]))
+
+            gt_cytotoxicity_3.append(cytotox(gt_counts_3["dead"],
+                                             gt_counts_3["alive"], gt_counts_3["inhib"]))
+
+            gt_cytotoxicity_union.append(cytotox(gt_counts_union["dead"],
+                                                 gt_counts_union["alive"], gt_counts_union["inhib"]))
+
+            ip_pred_cytotoxicity.append(cytotox(ip_counts["dead"],
+                                                ip_counts["alive"], ip_counts["inhib"]))
+            dl_pred_cytotoxicity.append(cytotox(dl_counts["dead"],
+                                                dl_counts["alive"], dl_counts["inhib"]))
+
+
+print(gt_cytotoxicity_1)
+print(gt_cytotoxicity_2)
+print(gt_cytotoxicity_3)
+print(gt_cytotoxicity_union)
+
+print(ip_pred_cytotoxicity)
+print(dl_pred_cytotoxicity)
+
+
+print("READER1")
+ip_test_metrics = pd.DataFrame(classification_report(
+    gt_cytotoxicity_1, ip_pred_cytotoxicity, output_dict=True)).reset_index()
+dl_test_metrics = pd.DataFrame(classification_report(
+    gt_cytotoxicity_1, dl_pred_cytotoxicity, output_dict=True)).reset_index()
+print(ip_test_metrics)
+print(dl_test_metrics)
+
+
+print("READER2")
+ip_test_metrics = pd.DataFrame(classification_report(
+    gt_cytotoxicity_2, ip_pred_cytotoxicity, output_dict=True)).reset_index()
+dl_test_metrics = pd.DataFrame(classification_report(
+    gt_cytotoxicity_2, dl_pred_cytotoxicity, output_dict=True)).reset_index()
+print(ip_test_metrics)
+print(dl_test_metrics)
+
+
+print("READER3")
+ip_test_metrics = pd.DataFrame(classification_report(
+    gt_cytotoxicity_3, ip_pred_cytotoxicity, output_dict=True)).reset_index()
+dl_test_metrics = pd.DataFrame(classification_report(
+    gt_cytotoxicity_3, dl_pred_cytotoxicity, output_dict=True)).reset_index()
+print(ip_test_metrics)
+print(dl_test_metrics)
+
+
+print("READERUNION")
+ip_test_metrics = pd.DataFrame(classification_report(
+    gt_cytotoxicity_union, ip_pred_cytotoxicity, output_dict=True)).reset_index()
+dl_test_metrics = pd.DataFrame(classification_report(
+    gt_cytotoxicity_union, dl_pred_cytotoxicity, output_dict=True)).reset_index()
+print(ip_test_metrics)
+print(dl_test_metrics)
