@@ -230,9 +230,9 @@ def pipeline(image, gabor_filter, feature_df):
     out_img = visualize(image, selected_bboxes, selected_pr,
                         selected_label, category_id_to_name={
                             1: 'alive', 2: 'inhib', 0: 'dead'})
-    # plt.title("Image processing output")
-    # plt.imshow(out_img)
-    # plt.show()
+    plt.title("Image processing output")
+    plt.imshow(out_img)
+    plt.show()
 
     boxes_final["pred"] = selected_label
     return {"dead": sum(boxes_final["pred"] == 0),
@@ -341,47 +341,42 @@ if __name__ == "__main__":
             dl_pred_cytotoxicity.append(cytotox(dl_counts["dead"],
                                                 dl_counts["alive"], dl_counts["inhib"]))
 
+    print(gt_cytotoxicity_1)
+    print(gt_cytotoxicity_2)
+    print(gt_cytotoxicity_3)
+    print(gt_cytotoxicity_union)
 
-print(gt_cytotoxicity_1)
-print(gt_cytotoxicity_2)
-print(gt_cytotoxicity_3)
-print(gt_cytotoxicity_union)
+    print(ip_pred_cytotoxicity)
+    print(dl_pred_cytotoxicity)
 
-print(ip_pred_cytotoxicity)
-print(dl_pred_cytotoxicity)
+    print("READER1")
+    ip_test_metrics = pd.DataFrame(classification_report(
+        gt_cytotoxicity_1, ip_pred_cytotoxicity, output_dict=True)).reset_index()
+    dl_test_metrics = pd.DataFrame(classification_report(
+        gt_cytotoxicity_1, dl_pred_cytotoxicity, output_dict=True)).reset_index()
+    print(ip_test_metrics)
+    print(dl_test_metrics)
 
+    print("READER2")
+    ip_test_metrics = pd.DataFrame(classification_report(
+        gt_cytotoxicity_2, ip_pred_cytotoxicity, output_dict=True)).reset_index()
+    dl_test_metrics = pd.DataFrame(classification_report(
+        gt_cytotoxicity_2, dl_pred_cytotoxicity, output_dict=True)).reset_index()
+    print(ip_test_metrics)
+    print(dl_test_metrics)
 
-print("READER1")
-ip_test_metrics = pd.DataFrame(classification_report(
-    gt_cytotoxicity_1, ip_pred_cytotoxicity, output_dict=True)).reset_index()
-dl_test_metrics = pd.DataFrame(classification_report(
-    gt_cytotoxicity_1, dl_pred_cytotoxicity, output_dict=True)).reset_index()
-print(ip_test_metrics)
-print(dl_test_metrics)
+    print("READER3")
+    ip_test_metrics = pd.DataFrame(classification_report(
+        gt_cytotoxicity_3, ip_pred_cytotoxicity, output_dict=True)).reset_index()
+    dl_test_metrics = pd.DataFrame(classification_report(
+        gt_cytotoxicity_3, dl_pred_cytotoxicity, output_dict=True)).reset_index()
+    print(ip_test_metrics)
+    print(dl_test_metrics)
 
-
-print("READER2")
-ip_test_metrics = pd.DataFrame(classification_report(
-    gt_cytotoxicity_2, ip_pred_cytotoxicity, output_dict=True)).reset_index()
-dl_test_metrics = pd.DataFrame(classification_report(
-    gt_cytotoxicity_2, dl_pred_cytotoxicity, output_dict=True)).reset_index()
-print(ip_test_metrics)
-print(dl_test_metrics)
-
-
-print("READER3")
-ip_test_metrics = pd.DataFrame(classification_report(
-    gt_cytotoxicity_3, ip_pred_cytotoxicity, output_dict=True)).reset_index()
-dl_test_metrics = pd.DataFrame(classification_report(
-    gt_cytotoxicity_3, dl_pred_cytotoxicity, output_dict=True)).reset_index()
-print(ip_test_metrics)
-print(dl_test_metrics)
-
-
-print("READERUNION")
-ip_test_metrics = pd.DataFrame(classification_report(
-    gt_cytotoxicity_union, ip_pred_cytotoxicity, output_dict=True)).reset_index()
-dl_test_metrics = pd.DataFrame(classification_report(
-    gt_cytotoxicity_union, dl_pred_cytotoxicity, output_dict=True)).reset_index()
-print(ip_test_metrics)
-print(dl_test_metrics)
+    print("READERUNION")
+    ip_test_metrics = pd.DataFrame(classification_report(
+        gt_cytotoxicity_union, ip_pred_cytotoxicity, output_dict=True)).reset_index()
+    dl_test_metrics = pd.DataFrame(classification_report(
+        gt_cytotoxicity_union, dl_pred_cytotoxicity, output_dict=True)).reset_index()
+    print(ip_test_metrics)
+    print(dl_test_metrics)
