@@ -1,12 +1,13 @@
 from pathlib import Path
 
-data_dir = Path("../data/chrisi")
-output_dir = Path("../feature/data/output")
-output_dir.mkdir(exist_ok=True)
+data_dir = Path("data/chrisi")
+output_dir = Path("data/output")
+output_dir.mkdir(parents=True, exist_ok=True)
 bbox_dir = output_dir/Path("bbox_dir")
 
-model_path = output_dir/Path("model_rf_intersect.pkl")
-feature_path = Path("../feature/intersect_gabor_1.csv")
+model_path = output_dir/Path("model_Random Forest_.pkl")
+feature_path = Path("feature/output/gabor_index_1000.csv")
 image_dir = data_dir / Path("test_labelled")
-deep_learning_out_dir = data_dir / Path(
-    "weak_labels_reduced_nms/deep_learning_output/deep_learning_output_MB_ST_SH/test_labelled/")
+deep_learning_out_dir = output_dir / Path(
+    "deep_learning_output_MB_ST_SH/test_labelled/")
+deep_learning_out_dir.mkdir(parents=True, exist_ok=True)
