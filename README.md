@@ -1,4 +1,12 @@
 # cell-segmentation
+
+
+## To reproduce the Deep Learning results 
+To run and reproduce the Deep Learning results, we have created a colab notebook [CytoNet_DL_reproduce.ipynb](https://colab.research.google.com/drive/1FBXXMTlrzfe7hL2k9k3wQ3Dm4fkI6Gu0?authuser=3). You need to login with the credentials for `ucasdeeplearning3@gmail.com` to get access to data and models.
+
+## To visualize the results 
+To visualize the results from Image processing, machine learning and deep learning, we have created a colab notebook [Visualization_notebook.ipynb](https://colab.research.google.com/drive/1p3i1XsvdqDMm-c5g4KFlUg-BtJ-0Q-O-?usp=sharing). You need to login with the credentials for `ucasdeeplearning3@gmail.com` to get access to data and models.
+
 ## Image processing algorithms
 
 ### Alive cells detection
@@ -26,5 +34,3 @@ The training pipeline for cell state classification is in [`feature/training.py`
 ## Inference Pipeline for Cell state classifier
 To run the inference pipeline, add path to the chosen bounding boxes from Deep Learning in [`settings.py`](https://github.com/marwankefah/cell-segmentation/blob/master/settings.py), and run `python -m src.run_nms_before` in your terminal. The inference pipeline is in [`src/run_nms_before`](https://github.com/marwankefah/cell-segmentation/blob/master/src/run_nms_before.py).
 
-## To reproduce the Deep Learning results 
-To run and reproduce the Deep Learning results, we have created a colab notebook [CytoNet_DL_reproduce.ipynb](https://colab.research.google.com/drive/1FBXXMTlrzfe7hL2k9k3wQ3Dm4fkI6Gu0?authuser=3). You need to login with the credentials for `ucasdeeplearning3@gmail.com` to get access to data and models.
