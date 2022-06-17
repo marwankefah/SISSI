@@ -52,7 +52,7 @@ def train(configs, snapshot_path):
 
     weak_label_chrisi_dataset = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead', 'inhib'],
                                                configs.train_detections_transforms,
-                                               cache_labels=True, need_seam_less_clone=configs.need_seam_less_clone)
+                                               cache_labels=True, need_seam_less_clone=False)
 
     weak_label_chrisi_dataset_val = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead', 'inhib'],
                                                    configs.val_detections_transforms,

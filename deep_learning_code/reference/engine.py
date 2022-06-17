@@ -442,6 +442,10 @@ def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_
         else:
             configs.need_label_correction = utils.if_update(configs.train_iou_values, epoch_num, n_epoch=max_epoch,
                                                             threshold=configs.label_correction_threshold)
+            #for adaptive seamless cloning with ADELE and without/
+            #once  weak_label_chrisi_dataset.need_seam_less_clone = True it will always be tru
+            if configs.need_label_correction and configs.need_seam_less_clone:
+                weak_label_chrisi_dataset.need_seam_less_clone = True
 
 
 import os
