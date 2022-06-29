@@ -4,11 +4,13 @@ import configparser
 import os
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torchvision_our.models.detection.faster_rcnn import FastRCNNPredictor
-from torchvision_our.models.detection.mask_rcnn import MaskRCNNPredictor, maskrcnn_resnet50_fpn
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 import torch
+from network.faster_rcnn import fasterrcnn_resnet50_fpn
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+
+
 class Configs:
     def __init__(self, filename):
 
@@ -29,10 +31,10 @@ class Configs:
         self.cell_pose_img_root_path = config_file.get(
             'path', 'cell_pose_img_root_path', fallback='../data/FETA/')
 
-        self.chrisi_cells_root_path = config_file.get(
-            'path', 'chrisi_cells_root_path', fallback='../data/FETA/')
-        self.chrisi_cells_img_path = config_file.get(
-            'path', 'chrisi_cells_img_path', fallback='../data/FETA/')
+        self.cell_lab_root_path = config_file.get(
+            'path', 'cell_lab_root_path', fallback='../data/FETA/')
+        self.cell_lab_img_path = config_file.get(
+            'path', 'cell_lab_img_path', fallback='../data/FETA/')
 
         self.model_output_path = config_file.get(
             'path', 'model_output_path', fallback='..')
@@ -120,11 +122,8 @@ class Configs:
             'network', 'num_classes', fallback=2)
         self.in_channels = config_file.getint(
             'network', 'in_channels', fallback=1)
-        if self.overload_rcnn_predictor:
-            #overload blob detection
-            self.model = self.create_mask_rcnn(2)
-        else:
-            self.model = self.create_mask_rcnn(self.num_classes)
+
+        self.model = self.create_faster_rcnn(self.num_classes)
 
         use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if use_cuda else "cpu")
@@ -159,24 +158,16 @@ class Configs:
         self.best_performance = 0
         self.start_epoch = 0
 
-        if not self.train_mask:
-            self.model.roi_heads.mask_predictor = None
-
         if self.load_model:
             print(self.model_path)
             checkpoint = torch.load(self.model_path, map_location=self.device)
-            self.model.load_state_dict(checkpoint['model'])
-            self.optimizer.load_state_dict(checkpoint['optimizer'])
+            self.model.load_state_dict(checkpoint['model'], strict=False)
+            self.optimizer.load_state_dict(checkpoint['optimizer'],strict=False)
             self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
             self.start_epoch = checkpoint['epoch'] + 1
             self.best_performance = checkpoint['best_performance']
             self.train_iou_values = checkpoint['train_iou_values']
             self.need_label_correction = checkpoint['need_label_correction']
-
-        if self.overload_rcnn_predictor:
-            in_features = self.model.roi_heads.box_predictor.cls_score.in_features
-            self.model.roi_heads.box_predictor = FastRCNNPredictor(
-                in_features, self.num_classes)
 
         self.need_label_correction = config_file.getboolean(
             'network', 'need_label_correction', fallback=False)
@@ -187,14 +178,13 @@ class Configs:
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = lr_
 
-    def create_mask_rcnn(self, num_classes):
-
-        model = maskrcnn_resnet50_fpn(pretrained_backbone=True, rpn_positive_fraction=0.5
-                                      , rpn_fg_iou_thresh=0.7
-                                      , rpn_bg_iou_thresh=0.3
-                                      , box_nms_thresh=self.box_nms_thresh, box_score_thresh=self.box_score_thresh,
-                                      min_size=self.min_size, max_size=self.max_size,
-                                      box_detections_per_img=self.box_detections_per_img)
+    def create_faster_rcnn(self, num_classes):
+        model = fasterrcnn_resnet50_fpn(pretrained_backbone=True, rpn_positive_fraction=0.5
+                                        , rpn_fg_iou_thresh=0.7
+                                        , rpn_bg_iou_thresh=0.3
+                                        , box_nms_thresh=self.box_nms_thresh, box_score_thresh=self.box_score_thresh,
+                                        min_size=self.min_size, max_size=self.max_size,
+                                        box_detections_per_img=self.box_detections_per_img)
 
         # get number of input features for the classifier
         in_features = model.roi_heads.box_predictor.cls_score.in_features
@@ -202,15 +192,33 @@ class Configs:
         model.roi_heads.box_predictor = FastRCNNPredictor(
             in_features, num_classes)
 
-        # now get the number of input features for the mask classifier
-        in_features_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
-        hidden_layer = 256
-        # and replace the mask predictor with a new one
-        model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask,
-                                                           hidden_layer,
-                                                           num_classes)
-
         return model
+
+    #
+    # def create_mask_rcnn(self, num_classes):
+    #
+    #     model = maskrcnn_resnet50_fpn(pretrained_backbone=True, rpn_positive_fraction=0.5
+    #                                   , rpn_fg_iou_thresh=0.7
+    #                                   , rpn_bg_iou_thresh=0.3
+    #                                   , box_nms_thresh=self.box_nms_thresh, box_score_thresh=self.box_score_thresh,
+    #                                   min_size=self.min_size, max_size=self.max_size,
+    #                                   box_detections_per_img=self.box_detections_per_img)
+    #
+    #     # get number of input features for the classifier
+    #     in_features = model.roi_heads.box_predictor.cls_score.in_features
+    #     # replace the pre-trained head with a new one
+    #     model.roi_heads.box_predictor = FastRCNNPredictor(
+    #         in_features, num_classes)
+    #
+    #     # now get the number of input features for the mask classifier
+    #     in_features_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
+    #     hidden_layer = 256
+    #     # and replace the mask predictor with a new one
+    #     model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask,
+    #                                                        hidden_layer,
+    #                                                        num_classes)
+    #
+    #     return model
 
     def get_transform(self, train):
         if train:

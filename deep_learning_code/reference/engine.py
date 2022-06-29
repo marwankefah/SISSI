@@ -1,7 +1,7 @@
 import math
 import sys
 import random
-from odach_our import oda
+from odach import oda
 import cv2
 import torch
 import numpy as np
@@ -11,7 +11,8 @@ from reference.coco_eval import CocoEvaluator
 import reference.utils as utils
 from collections import Counter
 from torchvision.ops import boxes as box_ops
-
+import os
+import pandas as pd
 from reference.preprocess import mask_overlay
 
 category_ids = [1]
@@ -166,6 +167,8 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20, use
     torch.set_num_threads(1)
     cpu_device = torch.device("cpu")
     configs.model.eval()
+
+    #for returning losses/detections in fasterrcnn evaluation mode
     configs.model.rpn.training = True
     configs.model.roi_heads.training = True
 
@@ -229,7 +232,6 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20, use
         writer.add_scalar('info/AP_0.75_SEG', coco_evaluator.coco_eval['segm'].stats[2], epoch)
         writer.add_scalar('info/AR__SEG', coco_evaluator.coco_eval['segm'].stats[8], epoch)
 
-    # TODO fix loss
     val_losses_reduced = sum(loss for loss in val_loss_dict.values()) / total_iter_per_epoch
     loss_str = []
     for name, meter in val_loss_dict.items():
@@ -248,46 +250,6 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20, use
         return coco_evaluator.coco_eval['bbox']
 
     return coco_evaluator.coco_eval['bbox'].stats[1], outputs_list_dict, val_losses_reduced
-
-
-def test(configs, epoch, data_loader, device, writer):
-    # n_threads = torch.get_num_threads()
-    # FIXME (i need someone to fix me ) remove this and make paste_masks_in_image run on the GPU
-    # torch.set_num_threads(1)
-    configs.model.eval()
-    header = 'Testing: Epoch [{}]'.format(epoch)
-    logging.info('Testing with no annotations')
-
-    total_iter_per_epoch = len(data_loader)
-    for iter_per_epoch, (images, targets, cell_names) in enumerate(data_loader):
-        images = list(img.to(device) for img in images)
-        targets1 = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
-        torch.cuda.synchronize()
-        with torch.no_grad():
-            loss_dict, outputs = configs.model(images)
-
-        if iter_per_epoch % 10 == 0:
-            output_vis_to_tensorboard(images, targets1, outputs, (iter_per_epoch + epoch * 200), writer,
-                                      configs.train_mask)
-
-    # torch.set_num_threads(n_threads)
-
-    logging.info('{}  finished [{}/{}]'.format(header, iter_per_epoch, total_iter_per_epoch))
-    return
-
-
-def test_time_augmentation(configs, tta_model, data_loader, device, writer):
-    # Execute TTA!
-    configs.model.eval()
-    for iter_per_epoch, (images, targets, cell_names) in enumerate(data_loader):
-        targets1 = [{k: v.to(device) for k, v in t.items()} for t in targets]
-        images = list(img.to(device) for img in images)
-
-        outputs = tta_model(torch.stack(images).cuda())
-
-        output_vis_to_tensorboard(images, targets1, outputs, iter_per_epoch, writer,
-                                  configs.train_mask)
 
 
 def visualize_bbox(img, bbox, class_name, color=(150, 0, 0), thickness=1):
@@ -358,43 +320,6 @@ def output_vis_to_tensorboard(images, targets1, outputs, iter_per_epoch, writer,
         writer.add_image('image_output_masks', img_output_overlay_channel_first, iter_per_epoch)
 
 
-# works with batch size =1
-def coco_evaluate(outputs_list_dict, coco, epoch, writer, train_mask=False):
-    n_threads = torch.get_num_threads()
-    # FIXME (i need someone to fix me ) remove this and make paste_masks_in_image run on the GPU
-    # torch.set_num_threads(1)
-
-    header = 'Training Evaluation: Epoch [{}]'.format(epoch)
-    iou_types = ["bbox"]
-    if train_mask:
-        iou_types.append('segm')
-
-    coco_evaluator = CocoEvaluator(coco, iou_types)
-
-    for res in outputs_list_dict:
-        # torch.cuda.synchronize()
-        coco_evaluator.update(res)
-
-    # gather the stats from all processes
-    coco_evaluator.synchronize_between_processes()
-
-    # accumulate predictions from all images
-    coco_evaluator.accumulate()
-    coco_evaluator.summarize()
-    writer.add_scalar('info/AP_0.5_BOX', coco_evaluator.coco_eval['bbox'].stats[1], epoch)
-    writer.add_scalar('info/AP_0.75_BOX', coco_evaluator.coco_eval['bbox'].stats[2], epoch)
-    writer.add_scalar('info/AR__BOX', coco_evaluator.coco_eval['bbox'].stats[8], epoch)
-    if train_mask:
-        writer.add_scalar('info/AP_0.5_SEG', coco_evaluator.coco_eval['segm'].stats[1], epoch)
-        writer.add_scalar('info/AP_0.75_SEG', coco_evaluator.coco_eval['segm'].stats[2], epoch)
-        writer.add_scalar('info/AR__SEG', coco_evaluator.coco_eval['segm'].stats[8], epoch)
-
-    logging.info('{}  finished AP 0.5:{} '.format(header, coco_evaluator.coco_eval['bbox'].stats[1]))
-
-    # torch.set_num_threads(n_threads)
-    return coco_evaluator.coco_eval['bbox'].stats[1]
-
-
 def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_num, max_epoch):
     if configs.label_correction:
         # it needs label correction, then output the label correction in a folder and reload it again
@@ -448,10 +373,6 @@ def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_
                 weak_label_chrisi_dataset.need_seam_less_clone = True
 
 
-import os
-import pandas as pd
-
-
 def output_data_set_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, output_folder):
     for train_batch_output_dict in outputs_list_dict:
         for idx, model_single_output in train_batch_output_dict.items():
@@ -481,7 +402,6 @@ def output_data_set_labels(configs, weak_label_chrisi_dataset, outputs_list_dict
             ymin = ymin * y_scale
             ymax = ymax * y_scale
 
-            # TODO cast as int
             boxes = torch.stack((xmin, ymin, xmax, ymax), dim=1).type(torch.int32)
 
             cell_type_name = weak_label_chrisi_dataset.images_path[idx].split('\\')

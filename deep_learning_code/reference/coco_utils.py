@@ -1,14 +1,11 @@
 import copy
 import os
 from PIL import Image
-
 import torch
 import torch.utils.data
 import torchvision
-
 from pycocotools import mask as coco_mask
 from pycocotools.coco import COCO
-
 import reference.transforms as T
 
 

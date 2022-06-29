@@ -19,6 +19,63 @@ def illumination_correction(image):
     I_ilumination = image - 0.9 * img + np.mean(0.9 * img)
     return I_ilumination
 
+def nms(bounding_boxes, confidence_score, threshold):
+    # If no bounding boxes, return empty list
+    if len(bounding_boxes) == 0:
+        return [], []
+
+    # Bounding boxes
+    boxes = np.array(bounding_boxes)
+
+    # coordinates of bounding boxes
+    start_x = boxes[:, 0]
+    start_y = boxes[:, 1]
+    end_x = boxes[:, 2]
+    end_y = boxes[:, 3]
+
+    # Confidence scores of bounding boxes
+    score = np.array(confidence_score)
+
+    # Picked bounding boxes
+    picked_boxes = []
+    picked_score = []
+
+    # Compute areas of bounding boxes
+    areas = (end_x - start_x + 1) * (end_y - start_y + 1)
+
+    # Sort by confidence score of bounding boxes
+    order = np.argsort(score)
+
+    # Iterate bounding boxes
+    while order.size > 0:
+        # The index of largest confidence score
+        index = order[-1]
+
+        # Pick the bounding box with largest confidence score
+        picked_boxes.append(bounding_boxes[index])
+        picked_score.append(confidence_score[index])
+
+        # Compute ordinates of intersection-over-union(IOU)
+        x1 = np.maximum(start_x[index], start_x[order[:-1]])
+        x2 = np.minimum(end_x[index], end_x[order[:-1]])
+        y1 = np.maximum(start_y[index], start_y[order[:-1]])
+        y2 = np.minimum(end_y[index], end_y[order[:-1]])
+
+        # Compute areas of intersection-over-union
+        w = np.maximum(0.0, x2 - x1 + 1)
+        h = np.maximum(0.0, y2 - y1 + 1)
+        intersection = w * h
+
+        # Compute the ratio between intersection and union
+        ratio = intersection / \
+            (areas[index] + areas[order[:-1]] - intersection)
+
+        left = np.where(ratio < threshold)
+        order = order[left]
+
+    return picked_boxes, picked_score
+
+
 
 def EGT_Segmentation(I, min_cell_size=1, upper_hole_size_bound=np.inf, manual_finetune=0):
     # this controls how far each increment of manual_finetune moves the percentile threshold
@@ -220,3 +277,35 @@ def imposemin(img, minima):
     marker[minima == 1] = 0
     mask = np.minimum((img + 1), marker)
     return morphology.reconstruction(marker, mask, method='erosion')
+
+
+def visualize_bbox(img, bbox, class_name, color=(150, 0, 0), thickness=1):
+    """Visualizes a single bounding box on the image"""
+    x_min, y_min, x_max, y_max = bbox
+    x_min, x_max, y_min, y_max = int(x_min), int(x_max), int(y_min), int(y_max)
+
+    cv2.rectangle(img, (x_min, y_min), (x_max, y_max),
+                  color=color, thickness=thickness)
+
+    ((text_width, text_height), _) = cv2.getTextSize(
+        class_name, cv2.FONT_HERSHEY_SIMPLEX, 0.35, 1)
+    cv2.rectangle(img, (x_min, y_min - int(1.3 * text_height)),
+                  (x_min + text_width, y_min), color, -1)
+    cv2.putText(
+        img,
+        text=class_name,
+        org=(x_min, y_min - int(0.3 * text_height)),
+        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+        fontScale=0.35,
+        color=(150, 150, 150),
+        lineType=cv2.LINE_AA,
+    )
+    return img
+
+
+def visualize(image, bboxes, scores, category_ids, category_id_to_name):
+    img = image.copy()
+    for bbox, category_id, score in zip(bboxes, category_ids, scores):
+        class_name = category_id_to_name[category_id]
+        img = visualize_bbox(img, bbox, '{} {:.2f}'.format(class_name, score))
+    return img
