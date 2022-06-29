@@ -20,7 +20,7 @@ from tqdm import tqdm
 
 from configs.configs_inst_seg import Configs
 
-from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset, chrisi_dataset
+from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset
 
 import reference.utils as utils
 from reference.engine import train_one_epoch, evaluate, test, save_check_point
@@ -29,21 +29,12 @@ from reference.engine import train_one_epoch, evaluate, test, save_check_point
 def train(configs, snapshot_path):
     configs.train_writer = SummaryWriter(snapshot_path + '/log')
     configs.val_writer = SummaryWriter(snapshot_path + '/log_val')
-    configs.alive_writer = SummaryWriter(snapshot_path + '/log_alive')
-    configs.dead_writer = SummaryWriter(snapshot_path + '/log_dead')
-    configs.chrisi_test_writer = SummaryWriter(snapshot_path + '/log_chrisi_test')
 
     configs.model.to(configs.device)
 
     db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
 
-    db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
-                                    configs.val_detections_transforms)
-
-    chrisi_test_data_loader = torch.utils.data.DataLoader(
-        db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
-        collate_fn=utils.collate_fn)
 
     trainloader = torch.utils.data.DataLoader(
         db_train, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
@@ -64,17 +55,12 @@ def train(configs, snapshot_path):
 
     max_epoch = configs.max_iterations // len(trainloader) + 1
     iterator = tqdm(range(configs.start_epoch, max_epoch), ncols=70)
-    best_AP_50_all = configs.best_performance
 
     for epoch_num in iterator:
 
         train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
 
         _, _, val_losses_reduced = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
-
-        # evaluate chrisi testset
-        evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device, configs.chrisi_test_writer,
-                                vis_every_iter=1)  # AP iou 0.75--all bbox
 
         save_check_point(configs, epoch_num, val_losses_reduced, snapshot_path)
 

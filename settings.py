@@ -1,13 +1,15 @@
 from pathlib import Path
 
-data_dir = Path("data/chrisi")
-output_dir = Path("data/output")
-output_dir.mkdir(parents=True, exist_ok=True)
-bbox_dir = output_dir/Path("bbox_dir")
+cell_lab_data_dir = Path("../data/cell_lab")
 
-model_path = output_dir/Path("model_Random Forest_.pkl")
-feature_path = Path("feature/output/gabor_index_1000.csv")
-image_dir = data_dir / Path("test_labelled")
-deep_learning_out_dir = output_dir / Path(
-    "deep_learning_output_MB_ST_SH/test_labelled/")
-deep_learning_out_dir.mkdir(parents=True, exist_ok=True)
+# noisy annotations output folder from Image processing algorithms
+noisy_bbox_output_dir = Path("annotations")
+
+###for cell cyto classification
+noisy_annotations_generation_path = Path('../noisy_annotations_generation/')
+model_path = Path("cytotoxicity_classification/ML_Results/model_Random Forest_.pkl")
+feature_path = Path("cytotoxicity_classification/gabor_selected_indices/gabor_index_1000.csv")
+image_dir = Path("data/cell_lab") / Path("test_labelled")
+deep_learning_out_dir = Path(
+    "noisy_annotations_generation/deep_learning_output/test_labelled/")
+

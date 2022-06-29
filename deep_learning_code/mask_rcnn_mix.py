@@ -17,49 +17,43 @@ from tensorboardX import SummaryWriter
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-from torch.utils.data import DataLoader
 from tqdm import tqdm
-
 from configs.configs_inst_seg import Configs
-
-from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset, chrisi_dataset
-
+from dataloaders.instance_seg_dataset import cell_pose_dataset, cell_lab_dataset
 import reference.utils as utils
-from reference.engine import train_one_epoch, evaluate, test
-
-from reference.engine import coco_evaluate, correct_labels, save_check_point, train_mixed_one_epoch
+from reference.engine import train_one_epoch, evaluate
+from reference.engine import correct_labels, save_check_point, train_mixed_one_epoch
 
 
 def train(configs, snapshot_path):
     configs.train_writer = SummaryWriter(snapshot_path + '/log')
     configs.val_writer = SummaryWriter(snapshot_path + '/log_val')
-    configs.alive_writer = SummaryWriter(snapshot_path + '/log_alive')
-    configs.dead_writer = SummaryWriter(snapshot_path + '/log_dead')
-
-    configs.chrisi_test_writer = SummaryWriter(snapshot_path + '/log_chrisi_test')
-
-    configs.chrisi_test_writer_tta = SummaryWriter(snapshot_path + '/log_chrisi_test_tta')
 
     configs.cell_pose_test_writer = SummaryWriter(snapshot_path + '/log_cell_pose_test')
+
+    configs.cell_lab_test_writer = SummaryWriter(snapshot_path + '/log_cell_lab_test')
+
+    configs.cell_lab_test_writer_tta = SummaryWriter(snapshot_path + '/log_cell_lab_test_tta')
+
 
     configs.model.to(configs.device)
 
     db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
 
-    db_chrisi_test = chrisi_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
+    db_cell_lab_test = cell_lab_dataset(configs.cell_lab_root_path, ['test_labelled'],
                                     configs.val_detections_transforms, cache_labels=True)
 
-    weak_label_chrisi_dataset = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead', 'inhib'],
+    weak_label_cell_lab_dataset = cell_lab_dataset(configs.cell_lab_root_path, ['alive', 'dead', 'inhib'],
                                                configs.train_detections_transforms,
                                                cache_labels=True, need_seam_less_clone=False)
 
-    weak_label_chrisi_dataset_val = chrisi_dataset(configs.chrisi_cells_root_path, ['alive', 'dead', 'inhib'],
+    weak_label_cell_lab_dataset_val = cell_lab_dataset(configs.cell_lab_root_path, ['alive', 'dead', 'inhib'],
                                                    configs.val_detections_transforms,
                                                    cache_labels=True)
 
-    weak_label_chrisi_dataloader = torch.utils.data.DataLoader(
-        weak_label_chrisi_dataset, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
+    weak_label_cell_lab_dataloader = torch.utils.data.DataLoader(
+        weak_label_cell_lab_dataset, batch_size=configs.labelled_bs, shuffle=True, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
     cell_pose_train_dataloader = torch.utils.data.DataLoader(
@@ -71,13 +65,13 @@ def train(configs, snapshot_path):
         collate_fn=utils.collate_fn)
 
     initial_weak_labels_data_loader = torch.utils.data.DataLoader(
-        weak_label_chrisi_dataset_val, batch_size=configs.labelled_bs, shuffle=False,
+        weak_label_cell_lab_dataset_val, batch_size=configs.labelled_bs, shuffle=False,
         num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
 
-    chrisi_test_data_loader = torch.utils.data.DataLoader(
-        db_chrisi_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
+    cell_lab_test_data_loader = torch.utils.data.DataLoader(
+        db_cell_lab_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
     configs.model.train()
@@ -85,11 +79,11 @@ def train(configs, snapshot_path):
     writer = configs.train_writer
     writer_val = configs.val_writer
 
-    logging.info("{} iterations per epoch".format(len(weak_label_chrisi_dataloader)))
+    logging.info("{} iterations per epoch".format(len(weak_label_cell_lab_dataloader)))
 
     iter_num = 0
 
-    max_epoch = configs.max_iterations // len(weak_label_chrisi_dataloader) + 1
+    max_epoch = configs.max_iterations // len(weak_label_cell_lab_dataloader) + 1
     iterator = tqdm(range(configs.start_epoch, max_epoch), ncols=70)
 
     for epoch_num in iterator:
@@ -103,20 +97,20 @@ def train(configs, snapshot_path):
                                             writer=configs.cell_pose_test_writer)
 
         # evaluate chrisi testset
-        evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device,
+        evaluate(configs, epoch_num, cell_lab_test_data_loader, configs.device,
                                    configs.chrisi_test_writer,
                                    vis_every_iter=1)
 
-        evaluate(configs, epoch_num, chrisi_test_data_loader, configs.device,
+        evaluate(configs, epoch_num, cell_lab_test_data_loader, configs.device,
                         configs.chrisi_test_writer_tta,
                         vis_every_iter=1, use_tta=True)
 
         save_check_point(configs, epoch_num, val_losses_reduced, snapshot_path)
 
-        correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_num, max_epoch)
+        correct_labels(configs, weak_label_cell_lab_dataset, outputs_list_dict, epoch_num, max_epoch)
 
         weak_label_chrisi_dataloader = torch.utils.data.DataLoader(
-            weak_label_chrisi_dataset, batch_size=configs.labelled_bs, shuffle=True,
+            weak_label_cell_lab_dataset, batch_size=configs.labelled_bs, shuffle=True,
             num_workers=configs.num_workers,
             collate_fn=utils.collate_fn)
 

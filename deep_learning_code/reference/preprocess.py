@@ -1,6 +1,5 @@
 import colorsys
 import math
-
 import cv2
 import numpy as np
 from skimage import morphology

@@ -25,6 +25,7 @@ from .preprocess import (
     EGT_Segmentation,
     fill_holes,
     mask_overlay,
+    nms
 )
 
 from .seed_detection import log_kernel, conv2_spec_symetric, glogkernel, seed_detection
@@ -58,4 +59,5 @@ __all__ = [
     "conv2_spec_symetric",
     "glogkernel",
     "seed_detection",
+    "nms"
 ]
