@@ -20,16 +20,16 @@ if not os.path.exists(snapshot_path):
 
 configs.cell_lab_test_writer = SummaryWriter(snapshot_path + '/log_cell_lab_test')
 
-cell_lab_db_test = cell_lab_dataset(configs.chrisi_cells_root_path, ['test_labelled'],
+cell_lab_db_test = cell_lab_dataset(configs.cell_lab_root_path, ['test_labelled'],
                                     configs.val_detections_transforms, cache_labels=True,
                                     need_seam_less_clone=False, is_test=True)
 
-cell_lab_db_train = cell_lab_dataset(configs.chrisi_cells_root_path, ['inhib','dead'],
-                                     configs.val_detections_transforms, cache_labels=True,
-                                     need_seam_less_clone=False, is_test=True)
-random.seed(9001)
+# cell_lab_db_train = cell_lab_dataset(configs.cell_lab_root_path, ['inhib','dead'],
+#                                      configs.val_detections_transforms, cache_labels=True,
+#                                      need_seam_less_clone=False, is_test=True)
+# random.seed(9001)
 
-cell_lab_db_train.sample_list = random.sample(cell_lab_db_train.sample_list, 50)
+# cell_lab_db_train.sample_list = random.sample(cell_lab_db_train.sample_list, 50)
 
 cell_pose_db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
 
@@ -40,9 +40,9 @@ cell_pose_test_dataloader = torch.utils.data.DataLoader(
     cell_pose_db_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
     collate_fn=utils.collate_fn)
 
-cell_lab_train_data_loader = torch.utils.data.DataLoader(
-    cell_lab_db_train, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
-    collate_fn=utils.collate_fn)
+# cell_lab_train_data_loader = torch.utils.data.DataLoader(
+#     cell_lab_db_train, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
+#     collate_fn=utils.collate_fn)
 
 configs.model.to(configs.device)
 
