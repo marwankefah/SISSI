@@ -96,25 +96,25 @@ def train(configs, snapshot_path):
         _, _, val_losses_reduced = evaluate(configs, epoch_num, cell_pose_test_dataloader, device=configs.device,
                                             writer=configs.cell_pose_test_writer)
 
-        # evaluate chrisi testset
+        # evaluate celllab testset
         evaluate(configs, epoch_num, cell_lab_test_data_loader, configs.device,
-                                   configs.chrisi_test_writer,
+                                   configs.cell_lab_test_writer,
                                    vis_every_iter=1)
 
         evaluate(configs, epoch_num, cell_lab_test_data_loader, configs.device,
-                        configs.chrisi_test_writer_tta,
+                        configs.cell_lab_test_writer_tta,
                         vis_every_iter=1, use_tta=True)
 
         save_check_point(configs, epoch_num, val_losses_reduced, snapshot_path)
 
         correct_labels(configs, weak_label_cell_lab_dataset, outputs_list_dict, epoch_num, max_epoch)
 
-        weak_label_chrisi_dataloader = torch.utils.data.DataLoader(
+        weak_label_cell_lab_dataloader = torch.utils.data.DataLoader(
             weak_label_cell_lab_dataset, batch_size=configs.labelled_bs, shuffle=True,
             num_workers=configs.num_workers,
             collate_fn=utils.collate_fn)
 
-        train_mixed_one_epoch(configs, cell_pose_train_dataloader, weak_label_chrisi_dataloader, epoch_num, 20,
+        train_mixed_one_epoch(configs, cell_pose_train_dataloader, weak_label_cell_lab_dataloader, epoch_num, 20,
                               configs.train_writer)
 
         configs.lr_scheduler.step(val_losses_reduced)
