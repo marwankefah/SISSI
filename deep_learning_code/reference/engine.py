@@ -168,7 +168,7 @@ def evaluate(configs, epoch, data_loader, device, writer, vis_every_iter=20, use
     cpu_device = torch.device("cpu")
     configs.model.eval()
 
-    #for returning losses/detections in fasterrcnn evaluation mode
+    # for returning losses/detections in fasterrcnn evaluation mode
     configs.model.rpn.training = True
     configs.model.roi_heads.training = True
 
@@ -358,7 +358,8 @@ def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_
                     # TODO add label smoothing also?
                     if torch.numel(boxes) != 0:
                         weak_label_chrisi_dataset.sample_list[idx] = (
-                            weak_label_chrisi_dataset.sample_list[idx][0], boxes.tolist())
+                            weak_label_chrisi_dataset.sample_list[idx][0], boxes.tolist(),
+                            weak_label_chrisi_dataset.sample_list[idx][2])
                     else:
                         logging.info('image with id {} have no output'.format(idx))
 
@@ -367,8 +368,8 @@ def correct_labels(configs, weak_label_chrisi_dataset, outputs_list_dict, epoch_
         else:
             configs.need_label_correction = utils.if_update(configs.train_iou_values, epoch_num, n_epoch=max_epoch,
                                                             threshold=configs.label_correction_threshold)
-            #for adaptive seamless cloning with ADELE and without/
-            #once  weak_label_chrisi_dataset.need_seam_less_clone = True it will always be tru
+            # for adaptive seamless cloning with ADELE and without/
+            # once  weak_label_chrisi_dataset.need_seam_less_clone = True it will always be tru
             if configs.need_label_correction and configs.need_seam_less_clone:
                 weak_label_chrisi_dataset.need_seam_less_clone = True
 
