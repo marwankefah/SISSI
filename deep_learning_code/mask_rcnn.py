@@ -10,7 +10,6 @@ import random
 import shutil
 import sys
 import time
-from monai.data.utils import decollate_batch
 from tensorboardX import SummaryWriter
 import numpy as np
 import torch
@@ -20,20 +19,24 @@ from tqdm import tqdm
 
 from configs.configs_inst_seg import Configs
 
-from dataloaders.instance_seg_dataset import PennFudanDataset, cell_pose_dataset
+from dataloaders.instance_seg_dataset import cell_pose_dataset,cell_lab_dataset
 
 import reference.utils as utils
-from reference.engine import train_one_epoch, evaluate, test, save_check_point
+from reference.engine import train_one_epoch, evaluate, save_check_point
+
 
 
 def train(configs, snapshot_path):
     configs.train_writer = SummaryWriter(snapshot_path + '/log')
     configs.val_writer = SummaryWriter(snapshot_path + '/log_val')
+    configs.cell_lab_test_writer = SummaryWriter(snapshot_path + '/log_cell_lab_test')
 
     configs.model.to(configs.device)
 
     db_train = cell_pose_dataset(configs.cell_pose_root_path, 'train', configs.train_transform)
     db_test = cell_pose_dataset(configs.cell_pose_root_path, 'test', configs.val_transform)
+    db_cell_lab_test = cell_lab_dataset(configs.cell_lab_root_path, ['test_labelled'],
+                                    configs.val_detections_transforms, cache_labels=True)
 
 
     trainloader = torch.utils.data.DataLoader(
@@ -42,6 +45,10 @@ def train(configs, snapshot_path):
 
     valloader = torch.utils.data.DataLoader(
         db_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
+        collate_fn=utils.collate_fn)
+
+    cell_lab_test_data_loader = torch.utils.data.DataLoader(
+        db_cell_lab_test, batch_size=configs.val_batch_size, shuffle=False, num_workers=configs.num_workers,
         collate_fn=utils.collate_fn)
 
     configs.model.train()
@@ -61,6 +68,10 @@ def train(configs, snapshot_path):
         train_one_epoch(configs, trainloader, epoch_num, print_freq=10, writer=writer)
 
         _, _, val_losses_reduced = evaluate(configs, epoch_num, valloader, device=configs.device, writer=writer_val)
+
+        evaluate(configs, epoch_num, cell_lab_test_data_loader, configs.device,
+                                   configs.cell_lab_test_writer,
+                                   vis_every_iter=1)
 
         save_check_point(configs, epoch_num, val_losses_reduced, snapshot_path)
 

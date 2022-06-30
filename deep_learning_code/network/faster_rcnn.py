@@ -21,8 +21,8 @@ from torchvision.models.detection.rpn import RegionProposalNetwork,RPNHead
 
 
 def _default_anchorgen():
-    anchor_sizes = ((16,), (32,), (64,), (128,), (256,))
-    # anchor_sizes = ((32,), (64,), (128,), (256,), (512,))
+    anchor_sizes = ((32,), (64,), (128,), (256,), (512,))
+    # anchor_sizes = ((16,), (32,), (64,), (128,), (256,))
     aspect_ratios = ((0.5, 1.0, 2.0),) * len(anchor_sizes)
     return AnchorGenerator(anchor_sizes, aspect_ratios)
 
