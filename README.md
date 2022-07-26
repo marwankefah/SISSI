@@ -1,36 +1,35 @@
-# cell-segmentation
+# Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images
+
+This repository contains all the code written for the paper SISSI: Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images.
 
 
-## To reproduce the Deep Learning results 
-To run and reproduce the Deep Learning results, we have created a colab notebook [CytoNet_DL_reproduce.ipynb](https://colab.research.google.com/drive/1FBXXMTlrzfe7hL2k9k3wQ3Dm4fkI6Gu0?authuser=3). You need to login with the credentials for `ucasdeeplearning3@gmail.com` to get access to data and models.
+For MICCAI Workshop on [Domain Adaptation and Representation Transfer DART 2022](https://sites.google.com/view/dart2022/home).
 
-## To visualize the results 
-To visualize the results from Image processing, machine learning and deep learning, we have created a colab notebook [Visualization_notebook.ipynb](https://colab.research.google.com/drive/1p3i1XsvdqDMm-c5g4KFlUg-BtJ-0Q-O-?usp=sharing). You need to login with the credentials for `ucasdeeplearning3@gmail.com` to get access to data and models.
 
-## Image processing algorithms
+Marwan Kefah, Christina Bornberg, Manasi Kattel, Enrique Almar, Claudio Marrocco, Alessandro Bria
 
-### Alive cells detection
-The method for alive cells detection is in [`alive_cells/alive_cells_bboxes.py`](https://github.com/marwankefah/cell-segmentation/blob/master/alive_cells/alive_cells_bboxes.py).
+## Noisy annotiation generation
 
-### Dead cells detection
-The method for dead cells detection is in [`dead_cells/dead_cells_bboxes.py`](https://github.com/marwankefah/cell-segmentation/blob/master/dead_cells/dead_cells_bboxes.py).
+The code for noisy annotation generation is in [`noisy_annotations_generation`](https://github.com/marwankefah/cell-segmentation/tree/master/noisy_annotations_generation). Specific algorithms have been developed for different state of cells: dead, alive and inhibited, the noisy image level annotations are assumed to be true when developing these algorithms.  
 
-### Inhibited cells detection
-The method for inhibited cells detection is in [`inhib_cells/inhib_cells_bboxes.py`](https://github.com/marwankefah/cell-segmentation/blob/master/inhib_cells/inhib_cells_bboxes.py).
+## Training your model
 
-## Running feature extraction pipeline
-### Cropping and glcm features
-1. Make sure that the paths `image_dir` and `bbox_dir` in [`feature/extract_features.py`](https://github.com/marwankefah/cell-segmentation/blob/master/feature/extract_features.py) are correct. Path `bbox_dir` should contain .txt files with bounding boxes for all cell types in the same dir.
-2. Run `python -m feature.extract_features` in your terminal.
-3. Cropped images will be saved to `data/cropped` and the glcm features will be saved to `data/output`.
+You can run [`deep_learning_code/mask_rcnn_mix.py`](https://github.com/marwankefah/cell-segmentation/blob/master/deep_learning_code/mask_rcnn_mix.py) to train your model in SSSI framework.
 
-### Gabor features
-1. Run `python -m feature.gabor_filters` in your terminal.
-2. Index of top 1000 best features selected by AdaBoost will be saved to `feature/output/gabor_index.csv`.
+## SISSI Components
+### Determining the Start of the Semi-Supervised Phase
+- [ADELE](https://github.com/Kangningthu/ADELE) Adoption for Object detection
+- The implementation for determining the optimal point
+that represents the start of memorisation phase can be found in `if_update` in [`deep_learning_code/utils.py`](cytotoxicity_classification/Classifier.pyhttps://github.com/marwankefah/cell-segmentation/blob/a0ba82a8362ca814c92abd223533d3dbb35e19c2/deep_learning_code/reference/utils.py ).
 
-## Training the Machine Learning Cell State classifier
-The training pipeline for cell state classification is in [`feature/training.py`](https://github.com/marwankefah/cell-segmentation/blob/master/feature/extract_features.py). The model will be saved to `model_path` specified in [`settings.py`](https://github.com/marwankefah/cell-segmentation/blob/master/settings.py).
 
-## Inference Pipeline for Cell state classifier
-To run the inference pipeline, add path to the chosen bounding boxes from Deep Learning in [`settings.py`](https://github.com/marwankefah/cell-segmentation/blob/master/settings.py), and run `python -m src.run_nms_before` in your terminal. The inference pipeline is in [`src/run_nms_before`](https://github.com/marwankefah/cell-segmentation/blob/master/src/run_nms_before.py).
+### Pseudo Label Generation 
+- We adopt the implementation of TTA and Weighted Boxes Fusion from [kentaroy47](https://github.com/kentaroy47/ODA-Object-Detection-ttA) for pseudo label generation.
+- The code can be found in [`deep_learning_code/odach`](https://github.com/marwankefah/cell-segmentation/tree/a0ba82a8362ca814c92abd223533d3dbb35e19c2/deep_learning_code/odach).
+  
+### Synthetic-like image adaptation according to pseudo labels (Seamless cloning)
 
+- The use of seamless clone can be found in `seam_less_clone` in [`deep_learning_code/dataloaders/utils`](https://github.com/marwankefah/cell-segmentation/blob/a0ba82a8362ca814c92abd223533d3dbb35e19c2/deep_learning_code/dataloaders/utils.py).
+
+
+- The iterative update of synthetic-like images is handled by `cell_lab_dataset` in [`deep_learning_code/dataloaders/instance_seg_dataset.py`](https://github.com/marwankefah/cell-segmentation/blob/a0ba82a8362ca814c92abd223533d3dbb35e19c2/deep_learning_code/dataloaders/instance_seg_dataset.py) and the flag to perform this update is controlled in `correct_labels` in [`deep_learning_code/reference/engine.py`](https://github.com/marwankefah/cell-segmentation/blob/a0ba82a8362ca814c92abd223533d3dbb35e19c2/deep_learning_code/reference/engine.py).
