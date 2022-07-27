@@ -1,12 +1,11 @@
-# Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images
+# SISSI: Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images
 
-This repository contains all the code written for the paper SISSI: Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images.
+## Introduction
+This is the official PyTorch implementation of the paper "SISSI: Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images"
+to appear in MICCAI 2022 Workshop on [Domain Adaptation and Representation Transfer DART 2022](https://sites.google.com/view/dart2022/home). 
 
 
-For MICCAI Workshop on [Domain Adaptation and Representation Transfer DART 2022](https://sites.google.com/view/dart2022/home).
 
-
-Marwan Kefah, Christina Bornberg, Manasi Kattel, Enrique Almar, Claudio Marrocco, Alessandro Bria
 
 ## Noisy annotiation generation
 
@@ -14,7 +13,7 @@ The code for noisy annotation generation is in [`noisy_annotations_generation`](
 
 ## Training your model
 
-You can run [`deep_learning_code/mask_rcnn_mix.py`](https://github.com/marwankefah/cell-segmentation/blob/master/deep_learning_code/mask_rcnn_mix.py) to train your model in SSSI framework.
+You can run [`deep_learning_code/train_mix.py`](https://github.com/marwankefah/cell-segmentation/blob/master/deep_learning_code/train_mix.py) to train your model in SSSI framework.
 
 ## SISSI Components
 ### Determining the Start of the Semi-Supervised Phase
@@ -33,3 +32,15 @@ that represents the start of memorisation phase can be found in `if_update` in [
 
 
 - The iterative update of synthetic-like images is handled by `cell_lab_dataset` in [`deep_learning_code/dataloaders/instance_seg_dataset.py`](https://github.com/marwankefah/cell-segmentation/blob/a0ba82a8362ca814c92abd223533d3dbb35e19c2/deep_learning_code/dataloaders/instance_seg_dataset.py) and the flag to perform this update is controlled in `correct_labels` in [`deep_learning_code/reference/engine.py`](https://github.com/marwankefah/cell-segmentation/blob/a0ba82a8362ca814c92abd223533d3dbb35e19c2/deep_learning_code/reference/engine.py).
+
+
+## Citation
+If this code is useful for your research, please consider citing:
+```
+@article{elbatel2022,
+  title={SISSI: Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images},
+  author={Marawan Elbatel, Christina Bornberg, Manasi Kattel, Enrique Almar, Claudio Marrocco, Alessandro Bria},
+  journal={arXiv preprint arXiv:2201.08657},
+  year={2022}
+}
+```
