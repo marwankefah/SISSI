@@ -40,7 +40,7 @@ If this code is useful for your research, please consider citing:
 @article{elbatel2022,
   title={SISSI: Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images},
   author={Marawan Elbatel, Christina Bornberg, Manasi Kattel, Enrique Almar, Claudio Marrocco, Alessandro Bria},
-  journal={arXiv preprint arXiv:2201.08657},
+  journal={arXiv preprint arXiv:-----},
   year={2022}
 }
 ```
