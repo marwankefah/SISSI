@@ -11,7 +11,7 @@ from tensorboardX import SummaryWriter
 import reference.utils as utils
 from dataloaders.instance_seg_dataset import cell_pose_dataset
 
-configs = Configs('./configs/mask_rcnn_test.ini')
+configs = Configs('./configs/test.ini')
 log_time = int(time.time())
 snapshot_path = os.path.join(configs.model_path.split('.pth')[0], str(log_time), 'test')
 

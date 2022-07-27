@@ -123,7 +123,7 @@ def train(configs, snapshot_path):
 
 if __name__ == "__main__":
 
-    configs = Configs('./configs/mask_rcnn_mix.ini')
+    configs = Configs('./configs/train_mix.ini')
 
     if not configs.deterministic:
         cudnn.benchmark = True
