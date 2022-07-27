@@ -1,7 +1,7 @@
 # SISSI: Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images
 
 ## Introduction
-This is the official PyTorch implementation of the paper "[SISSI: Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images](https://arxiv.org/abs/2203.13993)"
+This is the official PyTorch implementation of the paper "[SISSI: Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images]()"
 to appear in MICCAI 2022 Workshop on [Domain Adaptation and Representation Transfer DART 2022](https://sites.google.com/view/dart2022/home). 
 
 
