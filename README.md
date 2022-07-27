@@ -34,7 +34,7 @@ that represents the start of memorisation phase can be found in `if_update` in [
 - The iterative update of synthetic-like images is handled by `cell_lab_dataset` in [`deep_learning_code/dataloaders/instance_seg_dataset.py`](https://github.com/marwankefah/cell-segmentation/blob/a0ba82a8362ca814c92abd223533d3dbb35e19c2/deep_learning_code/dataloaders/instance_seg_dataset.py) and the flag to perform this update is controlled in `correct_labels` in [`deep_learning_code/reference/engine.py`](https://github.com/marwankefah/cell-segmentation/blob/a0ba82a8362ca814c92abd223533d3dbb35e19c2/deep_learning_code/reference/engine.py).
 
 
-## Citation
+<!-- ## Citation
 If this code is useful for your research, please consider citing:
 ```
 @article{elbatel2022,
@@ -43,4 +43,4 @@ If this code is useful for your research, please consider citing:
   journal={arXiv preprint arXiv:-----},
   year={2022}
 }
-```
+``` -->
