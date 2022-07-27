@@ -5,7 +5,7 @@ This is the official PyTorch implementation of the paper "[SISSI: Seamless Itera
 to appear in MICCAI 2022 Workshop on [Domain Adaptation and Representation Transfer DART 2022](https://sites.google.com/view/dart2022/home). 
 
 
-![SISSI: pipeline](https://github.com/marwankefah/SISSI/blob/master/sissi_pipeline.eps)
+![SISSI: pipeline](https://github.com/marwankefah/SISSI/blob/master/SISSI_pipeline.png)
 
 ## Noisy annotiation generation
 
