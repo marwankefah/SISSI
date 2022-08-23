@@ -34,13 +34,17 @@ that represents the start of memorisation phase can be found in `if_update` in [
 - The iterative update of synthetic-like images is handled by `cell_lab_dataset` in [`deep_learning_code/dataloaders/instance_seg_dataset.py`](https://github.com/marwankefah/cell-segmentation/blob/a0ba82a8362ca814c92abd223533d3dbb35e19c2/deep_learning_code/dataloaders/instance_seg_dataset.py) and the flag to perform this update is controlled in `correct_labels` in [`deep_learning_code/reference/engine.py`](https://github.com/marwankefah/cell-segmentation/blob/a0ba82a8362ca814c92abd223533d3dbb35e19c2/deep_learning_code/reference/engine.py).
 
 
-<!-- ## Citation
+## Citation
 If this code is useful for your research, please consider citing:
 ```
-@article{elbatel2022,
-  title={SISSI: Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images},
-  author={Marawan Elbatel, Christina Bornberg, Manasi Kattel, Enrique Almar, Claudio Marrocco, Alessandro Bria},
-  journal={arXiv preprint arXiv:-----},
-  year={2022}
+@article{Elbatel2022,
+   author = {Marawan Elbatel and Christina Bornberg and Manasi Kattel and Enrique Almar and Claudio Marrocco and Alessandro Bria},
+   doi = {10.48550/arxiv.2208.03327},
+   month = {8},
+   title = {Seamless Iterative Semi-Supervised Correction of Imperfect Labels in Microscopy Images},
+   publisher = {arXiv},
+   url = {https://arxiv.org/abs/2208.03327v1},
+   year = {2022},
 }
-``` -->
+
+```
